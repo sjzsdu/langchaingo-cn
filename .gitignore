@@ -1,0 +1,34 @@
+# Go相关
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# IDE相关
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 操作系统相关
+.DS_Store
+Thumbs.db
+
+# 依赖管理
+vendor/
+
+# 环境变量和密钥
+.env
+*.pem
+*.key
+
+# 日志文件
+*.log
+
+# 临时文件
+tmp/
+temp/
