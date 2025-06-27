@@ -2,7 +2,9 @@ package deepseek
 
 import (
 	"net/http"
+	"os"
 
+	"github.com/sjzsdu/langchaingo-cn/llms/deepseek/internal/deepseekclient"
 	"github.com/tmc/langchaingo/callbacks"
 )
 
@@ -25,9 +27,23 @@ type Options struct {
 
 // DefaultOptions returns the default options for the DeepSeek LLM.
 func DefaultOptions() *Options {
+	// 从环境变量获取配置，如果环境变量不存在则使用默认值
+	apiKey := os.Getenv(deepseekclient.TokenEnvVarName)
+	// 使用 deepseekllm.go 中定义的 modelEnvVarName 常量
+	model := os.Getenv(deepseekclient.ModelEnvVarName)
+	if model == "" {
+		model = "deepseek-chat" // 默认使用 DeepSeek-V3 模型
+	}
+
+	baseURL := os.Getenv(deepseekclient.BaseURLEnvVarName)
+	if baseURL == "" {
+		baseURL = "https://api.deepseek.com"
+	}
+
 	return &Options{
-		BaseURL:    "https://api.deepseek.com",
-		Model:      "deepseek-chat", // 默认使用 DeepSeek-V3 模型
+		APIKey:     apiKey,
+		BaseURL:    baseURL,
+		Model:      model,
 		HTTPClient: http.DefaultClient,
 	}
 }

@@ -18,6 +18,8 @@ type ChatMessage struct {
 	Name string `json:"name,omitempty"`
 	// Prefix is a flag to enable chat prefix completion (Beta).
 	Prefix bool `json:"prefix,omitempty"`
+	// ToolCalls is the list of tool calls in the message.
+	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 }
 
 // ContentPart represents a part of a multi-modal message content.

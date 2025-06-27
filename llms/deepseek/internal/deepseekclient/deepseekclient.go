@@ -8,7 +8,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
+)
+
+const (
+	TokenEnvVarName   = "DEEPSEEK_API_KEY"  //nolint:gosec
+	BaseURLEnvVarName = "DEEPSEEK_BASE_URL" //nolint:gosec
+	ModelEnvVarName   = "DEEPSEEK_MODEL"    //nolint:gosec
 )
 
 // Client is a client for the DeepSeek API.
@@ -20,12 +27,6 @@ type Client struct {
 	// httpClient is the HTTP client to use for requests.
 	httpClient *http.Client
 }
-
-// 这个函数已被下方的同名函数替代，保留此注释作为提醒
-
-// 这个方法已被下方的同名方法替代，保留此注释作为提醒
-
-// 这个方法已被createChatStream方法替代，保留此注释作为提醒
 
 // updateToolCalls updates the tool calls in a message with new tool calls from a delta.
 func (c *Client) updateToolCalls(message *ChatResponseMessage, deltaToolCalls []ToolCall) {
@@ -85,11 +86,19 @@ func (c *Client) updateToolCalls(message *ChatResponseMessage, deltaToolCalls []
 // New creates a new DeepSeek API client.
 func New(apiKey, baseURL string, httpClient *http.Client) (*Client, error) {
 	if apiKey == "" {
-		return nil, fmt.Errorf("apiKey is required")
+		// 尝试从环境变量获取 API Key
+		apiKey = os.Getenv(TokenEnvVarName)
+		if apiKey == "" {
+			return nil, fmt.Errorf("apiKey is required")
+		}
 	}
 
 	if baseURL == "" {
-		baseURL = "https://api.deepseek.com"
+		// 尝试从环境变量获取 Base URL
+		baseURL = os.Getenv(BaseURLEnvVarName)
+		if baseURL == "" {
+			baseURL = "https://api.deepseek.com"
+		}
 	}
 
 	if httpClient == nil {

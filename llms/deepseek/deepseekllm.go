@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/sjzsdu/langchaingo-cn/llms/deepseek/internal/deepseekclient"
 	"github.com/tmc/langchaingo/callbacks"
@@ -34,12 +35,21 @@ func New(opts ...Option) (*LLM, error) {
 		opt(options)
 	}
 
+	// 如果没有提供 APIKey，尝试从环境变量获取
 	if options.APIKey == "" {
-		return nil, ErrMissingAPIKey
+		options.APIKey = os.Getenv(deepseekclient.TokenEnvVarName)
+		if options.APIKey == "" {
+			return nil, ErrMissingAPIKey
+		}
 	}
 
+	// 如果没有提供 Model，尝试从环境变量获取
 	if options.Model == "" {
-		return nil, ErrMissingModel
+		// 从 deepseekllm_option.go 中导入的常量
+		options.Model = os.Getenv(deepseekclient.ModelEnvVarName)
+		if options.Model == "" {
+			return nil, ErrMissingModel
+		}
 	}
 
 	client, err := deepseekclient.New(
@@ -292,6 +302,8 @@ func convertToDeepSeekMessages(messages []llms.MessageContent) ([]deepseekclient
 
 		// 处理多模态内容
 		contentParts := make([]deepseekclient.ContentPart, 0, len(message.Parts))
+		// 检查是否有工具调用
+		var toolCalls []deepseekclient.ToolCall
 		for _, part := range message.Parts {
 			switch p := part.(type) {
 			case llms.TextContent:
@@ -308,8 +320,17 @@ func convertToDeepSeekMessages(messages []llms.MessageContent) ([]deepseekclient
 					},
 				})
 			case llms.ToolCall:
-				// DeepSeek API不支持在消息中包含工具调用，跳过
-				continue
+				// 收集工具调用
+				if role == "assistant" {
+					toolCalls = append(toolCalls, deepseekclient.ToolCall{
+						ID:   p.ID,
+						Type: p.Type,
+						Function: &deepseekclient.FunctionCall{
+							Name:      p.FunctionCall.Name,
+							Arguments: p.FunctionCall.Arguments,
+						},
+					})
+				}
 			case llms.ToolCallResponse:
 				// 工具调用响应作为单独的消息处理
 				deepseekMessages = append(deepseekMessages, deepseekclient.ChatMessage{
@@ -327,10 +348,23 @@ func convertToDeepSeekMessages(messages []llms.MessageContent) ([]deepseekclient
 
 		// 如果有多模态内容，创建带有内容部分的消息
 		if len(contentParts) > 0 {
-			deepseekMessages = append(deepseekMessages, deepseekclient.ChatMessage{
+			chatMessage := deepseekclient.ChatMessage{
 				Role:         role,
 				ContentParts: contentParts,
-			})
+			}
+
+			deepseekMessages = append(deepseekMessages, chatMessage)
+		} else if role == "assistant" && len(toolCalls) > 0 {
+			// 如果没有内容部分但有工具调用，创建一个带有工具调用的消息
+			// DeepSeek API 要求 assistant 消息必须设置 content 和 tool_calls 字段
+
+			chatMessage := deepseekclient.ChatMessage{
+				Role:      role,
+				Content:   " ", // 设置为空格字符串而不是空字符串，确保 content 字段不为空
+				ToolCalls: toolCalls, // 添加工具调用到消息中
+			}
+
+			deepseekMessages = append(deepseekMessages, chatMessage)
 		}
 	}
 
