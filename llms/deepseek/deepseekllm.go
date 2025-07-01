@@ -360,7 +360,7 @@ func convertToDeepSeekMessages(messages []llms.MessageContent) ([]deepseekclient
 
 			chatMessage := deepseekclient.ChatMessage{
 				Role:      role,
-				Content:   " ", // 设置为空格字符串而不是空字符串，确保 content 字段不为空
+				Content:   " ",       // 设置为空格字符串而不是空字符串，确保 content 字段不为空
 				ToolCalls: toolCalls, // 添加工具调用到消息中
 			}
 
