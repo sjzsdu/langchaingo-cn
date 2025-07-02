@@ -23,7 +23,7 @@ func main() {
 	completion, err := llms.GenerateFromSinglePrompt(
 		ctx,
 		llm,
-		"中国历史上最著名的发明是什么？请列举五个并简要说明其重要性。",
+		"你是个什么模型？",
 		llms.WithTemperature(0.7),
 		llms.WithMaxTokens(1000),
 	)

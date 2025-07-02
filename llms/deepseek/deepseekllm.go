@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 
 	"github.com/sjzsdu/langchaingo-cn/llms/deepseek/internal/deepseekclient"
@@ -18,209 +19,142 @@ var (
 	ErrMissingAPIKey = errors.New("missing API key")
 	// ErrMissingModel is returned when the model is missing.
 	ErrMissingModel = errors.New("missing model")
+	// ErrUnexpectedResponseLength is returned when the response length is unexpected.
+	ErrUnexpectedResponseLength = errors.New("unexpected length of response")
+	// ErrInvalidContentType is returned when the content type is invalid.
+	ErrInvalidContentType = errors.New("invalid content type")
+	// ErrUnsupportedMessageType is returned when the message type is unsupported.
+	ErrUnsupportedMessageType = errors.New("unsupported message type")
+	// ErrUnsupportedContentType is returned when the content type is unsupported.
+	ErrUnsupportedContentType = errors.New("unsupported content type")
+)
+
+const (
+	DefaultModel  = "deepseek-chat"
+	RoleUser      = "user"
+	RoleAssistant = "assistant"
+	RoleSystem    = "system"
+	RoleTool      = "tool"
 )
 
 // LLM is a DeepSeek large language model.
 type LLM struct {
+	CallbacksHandler callbacks.Handler
 	client           *deepseekclient.Client
-	defaultModel     string
-	callbacksHandler callbacks.Handler
 }
+
+var _ llms.Model = (*LLM)(nil)
 
 // New creates a new DeepSeek LLM.
 func New(opts ...Option) (*LLM, error) {
-	options := DefaultOptions()
+	c, err := newClient(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("deepseek: failed to create client: %w", err)
+	}
+	return &LLM{
+		client: c,
+	}, nil
+}
+
+func newClient(opts ...Option) (*deepseekclient.Client, error) {
+	options := &Options{
+		APIKey:     os.Getenv(deepseekclient.TokenEnvVarName),
+		BaseURL:    os.Getenv(deepseekclient.BaseURLEnvVarName),
+		Model:      os.Getenv(deepseekclient.ModelEnvVarName),
+		HTTPClient: http.DefaultClient,
+	}
+
+	if options.BaseURL == "" {
+		options.BaseURL = deepseekclient.DefaultBaseURL
+	}
+	if options.Model == "" {
+		options.Model = DefaultModel
+	}
 
 	for _, opt := range opts {
 		opt(options)
 	}
 
-	// 如果没有提供 APIKey，尝试从环境变量获取
 	if options.APIKey == "" {
-		options.APIKey = os.Getenv(deepseekclient.TokenEnvVarName)
-		if options.APIKey == "" {
-			return nil, ErrMissingAPIKey
-		}
+		return nil, ErrMissingAPIKey
 	}
 
-	// 如果没有提供 Model，尝试从环境变量获取
-	if options.Model == "" {
-		// 从 deepseekllm_option.go 中导入的常量
-		options.Model = os.Getenv(deepseekclient.ModelEnvVarName)
-		if options.Model == "" {
-			return nil, ErrMissingModel
-		}
-	}
-
-	client, err := deepseekclient.New(
+	return deepseekclient.New(
 		options.APIKey,
 		options.BaseURL,
+		options.Model,
 		options.HTTPClient,
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	return &LLM{
-		client:           client,
-		defaultModel:     options.Model,
-		callbacksHandler: options.CallbacksHandler,
-	}, nil
 }
 
-// Call calls the DeepSeek API with the given prompt.
+// Call requests a completion for the given prompt.
 func (o *LLM) Call(ctx context.Context, prompt string, options ...llms.CallOption) (string, error) {
-	result, err := o.Generate(ctx, []string{prompt}, options...)
-	if err != nil {
-		return "", err
-	}
-
-	if len(result) == 0 {
-		return "", ErrEmptyResponse
-	}
-
-	return result[0], nil
+	return llms.GenerateFromSinglePrompt(ctx, o, prompt, options...)
 }
 
-// Generate generates completions for multiple prompts.
-func (o *LLM) Generate(
-	ctx context.Context,
-	prompts []string,
-	options ...llms.CallOption,
-) ([]string, error) {
-	callOpts := llms.CallOptions{}
+// GenerateContent implements the Model interface.
+func (o *LLM) GenerateContent(ctx context.Context, messages []llms.MessageContent, options ...llms.CallOption) (*llms.ContentResponse, error) {
+	if o.CallbacksHandler != nil {
+		o.CallbacksHandler.HandleLLMGenerateContentStart(ctx, messages)
+	}
+
+	opts := &llms.CallOptions{}
 	for _, opt := range options {
-		opt(&callOpts)
+		opt(opts)
 	}
 
-	model := o.defaultModel
-	if callOpts.Model != "" {
-		model = callOpts.Model
-	}
-
-	results := make([]string, 0, len(prompts))
-
-	for _, prompt := range prompts {
-		messages := []deepseekclient.ChatMessage{
-			{
-				Role:    "user",
-				Content: prompt,
-			},
-		}
-
-		// 构建请求参数
-		request := deepseekclient.ChatRequest{
-			Model:            model,
-			Messages:         messages,
-			MaxTokens:        callOpts.MaxTokens,
-			Temperature:      callOpts.Temperature,
-			TopP:             callOpts.TopP,
-			N:                callOpts.N,
-			Stop:             callOpts.StopWords,
-			FrequencyPenalty: callOpts.FrequencyPenalty,
-			PresencePenalty:  callOpts.PresencePenalty,
-			Stream:           callOpts.StreamingFunc != nil,
-			StreamingFunc:    callOpts.StreamingFunc,
-		}
-
-		// 处理JSON模式
-		if callOpts.JSONMode {
-			request.JSONMode = true
-		}
-
-		// 处理种子
-		if callOpts.Seed != 0 {
-			request.Seed = callOpts.Seed
-		}
-
-		// 发送请求
-		resp, err := o.client.CreateChat(ctx, request)
-		if err != nil {
-			if o.callbacksHandler != nil {
-				o.callbacksHandler.HandleLLMError(ctx, err)
-			}
-			return nil, err
-		}
-
-		if len(resp.Choices) == 0 {
-			if o.callbacksHandler != nil {
-				o.callbacksHandler.HandleLLMError(ctx, ErrEmptyResponse)
-			}
-			return nil, ErrEmptyResponse
-		}
-
-		// 处理生成结果
-		for _, choice := range resp.Choices {
-			results = append(results, choice.Message.Content)
-		}
-	}
-
-	return results, nil
+	return generateMessagesContent(ctx, o, messages, opts)
 }
 
-// GenerateContent generates content based on the provided parts.
-func (o *LLM) GenerateContent(
-	ctx context.Context,
-	messages []llms.MessageContent,
-	options ...llms.CallOption,
-) (*llms.ContentResponse, error) {
-	if o.callbacksHandler != nil {
-		o.callbacksHandler.HandleLLMGenerateContentStart(ctx, messages)
-	}
-
-	callOpts := llms.CallOptions{}
-	for _, opt := range options {
-		opt(&callOpts)
-	}
-
-	model := o.defaultModel
-	if callOpts.Model != "" {
-		model = callOpts.Model
-	}
-
+func generateMessagesContent(ctx context.Context, o *LLM, messages []llms.MessageContent, opts *llms.CallOptions) (*llms.ContentResponse, error) {
 	deepseekMessages, err := convertToDeepSeekMessages(messages)
 	if err != nil {
-		if o.callbacksHandler != nil {
-			o.callbacksHandler.HandleLLMError(ctx, err)
-		}
-		return nil, err
+		return nil, fmt.Errorf("deepseek: failed to process messages: %w", err)
 	}
 
-	// 构建请求参数
+	tools := convertTools(opts.Tools)
+	if opts.Model == "" {
+		opts.Model = o.client.Model
+	}
+
 	request := deepseekclient.ChatRequest{
-		Model:            model,
+		Model:            opts.Model,
 		Messages:         deepseekMessages,
-		MaxTokens:        callOpts.MaxTokens,
-		Temperature:      callOpts.Temperature,
-		TopP:             callOpts.TopP,
-		N:                callOpts.N,
-		Stop:             callOpts.StopWords,
-		FrequencyPenalty: callOpts.FrequencyPenalty,
-		PresencePenalty:  callOpts.PresencePenalty,
-		Stream:           callOpts.StreamingFunc != nil,
-		StreamingFunc:    callOpts.StreamingFunc,
-		Tools:            convertTools(callOpts.Tools),
-		ToolChoice:       convertToolChoice(callOpts.ToolChoice),
-		JSONMode:         callOpts.JSONMode,
+		MaxTokens:        opts.MaxTokens,
+		Temperature:      opts.Temperature,
+		TopP:             opts.TopP,
+		N:                opts.N,
+		Stop:             opts.StopWords,
+		FrequencyPenalty: opts.FrequencyPenalty,
+		PresencePenalty:  opts.PresencePenalty,
+		Stream:           opts.StreamingFunc != nil,
+		StreamingFunc:    opts.StreamingFunc,
+		Tools:            tools,
+		ToolChoice:       convertToolChoice(opts.ToolChoice),
+	}
+
+	// 处理JSON模式
+	if opts.JSONMode {
+		request.JSONMode = true
 	}
 
 	// 处理种子
-	if callOpts.Seed != 0 {
-		request.Seed = callOpts.Seed
+	if opts.Seed != 0 {
+		request.Seed = opts.Seed
 	}
 
 	// 发送请求
 	resp, err := o.client.CreateChat(ctx, request)
 	if err != nil {
-		if o.callbacksHandler != nil {
-			o.callbacksHandler.HandleLLMError(ctx, err)
+		if o.CallbacksHandler != nil {
+			o.CallbacksHandler.HandleLLMError(ctx, err)
 		}
-		return nil, err
+		return nil, fmt.Errorf("deepseek: failed to create chat: %w", err)
 	}
 
 	if len(resp.Choices) == 0 {
-		if o.callbacksHandler != nil {
-			o.callbacksHandler.HandleLLMError(ctx, ErrEmptyResponse)
+		if o.CallbacksHandler != nil {
+			o.CallbacksHandler.HandleLLMError(ctx, ErrEmptyResponse)
 		}
 		return nil, ErrEmptyResponse
 	}
@@ -272,8 +206,8 @@ func (o *LLM) GenerateContent(
 		contentResponse.Choices[i] = contentChoice
 	}
 
-	if o.callbacksHandler != nil {
-		o.callbacksHandler.HandleLLMGenerateContentEnd(ctx, contentResponse)
+	if o.CallbacksHandler != nil {
+		o.CallbacksHandler.HandleLLMGenerateContentEnd(ctx, contentResponse)
 	}
 
 	return contentResponse, nil
@@ -342,7 +276,7 @@ func convertToDeepSeekMessages(messages []llms.MessageContent) ([]deepseekclient
 				// 跳过将此部分添加到当前消息的内容部分
 				continue
 			default:
-				return nil, fmt.Errorf("unsupported content part type: %T", p)
+				return nil, fmt.Errorf("deepseek: unsupported content part type: %T", p)
 			}
 		}
 
@@ -375,19 +309,19 @@ func convertToDeepSeekMessages(messages []llms.MessageContent) ([]deepseekclient
 func convertMessageType(messageType llms.ChatMessageType) (string, error) {
 	switch messageType {
 	case llms.ChatMessageTypeSystem:
-		return "system", nil
-	case llms.ChatMessageTypeAI:
-		return "assistant", nil
+		return RoleSystem, nil
 	case llms.ChatMessageTypeHuman:
-		return "user", nil
-	case llms.ChatMessageTypeGeneric:
-		return "user", nil
-	case llms.ChatMessageTypeFunction:
-		return "function", nil
+		return RoleUser, nil
+	case llms.ChatMessageTypeAI:
+		return RoleAssistant, nil
 	case llms.ChatMessageTypeTool:
-		return "tool", nil
+		return RoleTool, nil
+	case llms.ChatMessageTypeGeneric:
+		return RoleUser, nil
+	case llms.ChatMessageTypeFunction:
+		return RoleTool, nil
 	default:
-		return "", fmt.Errorf("unsupported message type: %v", messageType)
+		return "", fmt.Errorf("deepseek: %w: %v", ErrUnsupportedMessageType, messageType)
 	}
 }
 
@@ -397,22 +331,18 @@ func convertTools(tools []llms.Tool) []deepseekclient.Tool {
 		return nil
 	}
 
-	deepseekTools := make([]deepseekclient.Tool, len(tools))
+	toolReq := make([]deepseekclient.Tool, len(tools))
 	for i, tool := range tools {
-		deepseekTools[i] = deepseekclient.Tool{
-			Type: tool.Type,
-		}
-
-		if tool.Function != nil {
-			deepseekTools[i].Function = &deepseekclient.FunctionDefinition{
+		toolReq[i] = deepseekclient.Tool{
+			Type: "function",
+			Function: &deepseekclient.FunctionDefinition{
 				Name:        tool.Function.Name,
 				Description: tool.Function.Description,
 				Parameters:  tool.Function.Parameters,
-			}
+			},
 		}
 	}
-
-	return deepseekTools
+	return toolReq
 }
 
 // convertToolChoice converts langchaingo tool choice to DeepSeek tool choice.
@@ -423,20 +353,18 @@ func convertToolChoice(toolChoice any) any {
 
 	switch tc := toolChoice.(type) {
 	case string:
-		return tc
+		if tc == "auto" || tc == "none" {
+			return tc
+		}
+		return nil
 	case llms.ToolChoice:
-		deepseekToolChoice := deepseekclient.ToolChoice{
-			Type: tc.Type,
-		}
-
-		if tc.Function != nil {
-			deepseekToolChoice.Function = &deepseekclient.FunctionReference{
+		return deepseekclient.ToolChoice{
+			Type: "function",
+			Function: &deepseekclient.FunctionReference{
 				Name: tc.Function.Name,
-			}
+			},
 		}
-
-		return deepseekToolChoice
 	default:
-		return toolChoice
+		return nil
 	}
 }
