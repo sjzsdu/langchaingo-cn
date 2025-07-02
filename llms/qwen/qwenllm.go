@@ -64,16 +64,13 @@ var (
 	ErrRequestFailed = errors.New("请求失败")
 )
 
-// LLM 是通义千问大语言模型的客户端
-type LLM struct {
+// LLMConfig 包含LLM的配置选项
+type LLMConfig struct {
 	// CallbacksHandler 是回调处理器
 	CallbacksHandler callbacks.Handler
 
-	// client 是通义千问API客户端
-	client *qwenclient.Client
-
-	// QWenModel 是要使用的模型名称
-	QWenModel string
+	// Model 是要使用的模型名称
+	Model string
 
 	// Temperature 控制随机性，值越高回复越随机
 	Temperature float64
@@ -91,14 +88,26 @@ type LLM struct {
 	UseOpenAICompatible bool
 }
 
+// LLM 是通义千问大语言模型的客户端
+type LLM struct {
+	// config 是LLM的配置
+	config LLMConfig
+
+	// client 是通义千问API客户端
+	client qwenclient.APIClient
+}
+
 // New 创建一个新的通义千问LLM客户端
 func New(opts ...Option) (*LLM, error) {
+	// 获取默认选项
 	options := defaultOptions()
 
+	// 应用选项
 	for _, opt := range opts {
 		opt(options)
 	}
 
+	// 验证必要参数
 	if options.apiKey == "" {
 		return nil, ErrMissingAPIKey
 	}
@@ -120,47 +129,54 @@ func New(opts ...Option) (*LLM, error) {
 		clientOpts = append(clientOpts, qwenclient.WithHTTPClient(options.httpClient))
 	}
 
+	// 创建客户端
 	client, err := qwenclient.NewClient(options.apiKey, clientOpts...)
 	if err != nil {
 		// 提供更详细的错误信息
 		return nil, fmt.Errorf("创建通义千问客户端失败: %w (请确保提供了有效的API密钥)", err)
 	}
 
+	// 创建LLM实例
 	return &LLM{
-		CallbacksHandler:    options.callbacksHandler,
-		client:              client,
-		QWenModel:           options.model,
-		Temperature:         options.temperature,
-		TopP:                options.topP,
-		TopK:                options.topK,
-		MaxTokens:           options.maxTokens,
-		UseOpenAICompatible: options.useOpenAICompatible,
+		config: LLMConfig{
+			CallbacksHandler:    options.callbacksHandler,
+			Model:               options.model,
+			Temperature:         options.temperature,
+			TopP:                options.topP,
+			TopK:                options.topK,
+			MaxTokens:           options.maxTokens,
+			UseOpenAICompatible: options.useOpenAICompatible,
+		},
+		client: client,
 	}, nil
 }
 
 // Call 调用通义千问API生成文本
 func (o *LLM) Call(ctx context.Context, prompt string, options ...llms.CallOption) (string, error) {
+	// 处理调用选项
 	llmOptions := llms.CallOptions{}
 	for _, opt := range options {
 		opt(&llmOptions)
 	}
 
 	// 处理回调
-	if o.CallbacksHandler != nil {
-		o.CallbacksHandler.HandleLLMStart(ctx, []string{prompt})
+	callbackHandler := o.config.CallbacksHandler
+
+	if callbackHandler != nil {
+		callbackHandler.HandleLLMStart(ctx, []string{prompt})
 	}
 
 	// 构建请求
 	request := qwenclient.ChatRequest{
-		Model: o.QWenModel,
+		Model: o.config.Model,
 		Input: qwenclient.ChatRequestInput{
 			Prompt: prompt,
 		},
 		Parameters: qwenclient.ChatRequestParameters{
-			Temperature: o.Temperature,
-			TopP:        o.TopP,
-			TopK:        o.TopK,
-			MaxTokens:   o.MaxTokens,
+			Temperature: o.config.Temperature,
+			TopP:        o.config.TopP,
+			TopK:        o.config.TopK,
+			MaxTokens:   o.config.MaxTokens,
 		},
 	}
 
@@ -177,8 +193,8 @@ func (o *LLM) Call(ctx context.Context, prompt string, options ...llms.CallOptio
 	// 发送请求
 	response, err := o.client.CreateChat(ctx, request)
 	if err != nil {
-		if o.CallbacksHandler != nil {
-			o.CallbacksHandler.HandleLLMError(ctx, err)
+		if callbackHandler != nil {
+			callbackHandler.HandleLLMError(ctx, err)
 		}
 		return "", fmt.Errorf("%w: %v", ErrRequestFailed, err)
 	}
@@ -189,7 +205,7 @@ func (o *LLM) Call(ctx context.Context, prompt string, options ...llms.CallOptio
 	}
 
 	// 处理回调
-	if o.CallbacksHandler != nil {
+	if callbackHandler != nil {
 		// 创建一个ContentResponse用于回调
 		contentResponse := &llms.ContentResponse{
 			Choices: []*llms.ContentChoice{
@@ -198,7 +214,7 @@ func (o *LLM) Call(ctx context.Context, prompt string, options ...llms.CallOptio
 				},
 			},
 		}
-		o.CallbacksHandler.HandleLLMGenerateContentEnd(ctx, contentResponse)
+		callbackHandler.HandleLLMGenerateContentEnd(ctx, contentResponse)
 	}
 
 	return response.Output.Text, nil
@@ -222,15 +238,17 @@ func (o *LLM) Generate(ctx context.Context, prompts []string, options ...llms.Ca
 
 // GenerateContent 生成内容，支持多模态输入和工具调用
 func (o *LLM) GenerateContent(ctx context.Context, messages []llms.MessageContent, options ...llms.CallOption) (*llms.ContentResponse, error) {
-	// 处理回调
-	if o.CallbacksHandler != nil {
-		o.CallbacksHandler.HandleLLMGenerateContentStart(ctx, messages)
-	}
-
 	// 解析选项
 	llmOptions := llms.CallOptions{}
 	for _, opt := range options {
 		opt(&llmOptions)
+	}
+
+	// 处理回调
+	callbackHandler := o.config.CallbacksHandler
+
+	if callbackHandler != nil {
+		callbackHandler.HandleLLMGenerateContentStart(ctx, messages)
 	}
 
 	// 转换消息格式
@@ -241,15 +259,15 @@ func (o *LLM) GenerateContent(ctx context.Context, messages []llms.MessageConten
 
 	// 构建请求参数
 	request := qwenclient.ChatRequest{
-		Model: o.QWenModel,
+		Model: o.config.Model,
 		Input: qwenclient.ChatRequestInput{
 			Messages: qwenMessages,
 		},
 		Parameters: qwenclient.ChatRequestParameters{
-			Temperature: o.Temperature,
-			TopP:        o.TopP,
-			TopK:        o.TopK,
-			MaxTokens:   o.MaxTokens,
+			Temperature: o.config.Temperature,
+			TopP:        o.config.TopP,
+			TopK:        o.config.TopK,
+			MaxTokens:   o.config.MaxTokens,
 		},
 	}
 
@@ -280,8 +298,8 @@ func (o *LLM) GenerateContent(ctx context.Context, messages []llms.MessageConten
 	// 发送请求
 	response, err := o.client.CreateChat(ctx, request)
 	if err != nil {
-		if o.CallbacksHandler != nil {
-			o.CallbacksHandler.HandleLLMError(ctx, err)
+		if callbackHandler != nil {
+			callbackHandler.HandleLLMError(ctx, err)
 		}
 		return nil, fmt.Errorf("%w: %v", ErrRequestFailed, err)
 	}
@@ -322,9 +340,9 @@ func (o *LLM) GenerateContent(ctx context.Context, messages []llms.MessageConten
 	}
 
 	// 处理回调
-	if o.CallbacksHandler != nil {
+	if callbackHandler != nil {
 		// 直接使用contentResponse作为回调参数
-		o.CallbacksHandler.HandleLLMGenerateContentEnd(ctx, contentResponse)
+		callbackHandler.HandleLLMGenerateContentEnd(ctx, contentResponse)
 	}
 
 	return contentResponse, nil
@@ -662,27 +680,30 @@ func (s *streamingContentResponse) GetChunk() (string, error) {
 
 // StreamingCall 流式调用通义千问API生成文本
 func (o *LLM) StreamingCall(ctx context.Context, prompt string, options ...llms.CallOption) (StreamingResponse, error) {
+	// 处理调用选项
 	llmOptions := llms.CallOptions{}
 	for _, opt := range options {
 		opt(&llmOptions)
 	}
 
 	// 处理回调
-	if o.CallbacksHandler != nil {
-		o.CallbacksHandler.HandleLLMStart(ctx, []string{prompt})
+	callbackHandler := o.config.CallbacksHandler
+
+	if callbackHandler != nil {
+		callbackHandler.HandleLLMStart(ctx, []string{prompt})
 	}
 
 	// 构建请求
 	request := qwenclient.ChatRequest{
-		Model: o.QWenModel,
+		Model: o.config.Model,
 		Input: qwenclient.ChatRequestInput{
 			Prompt: prompt,
 		},
 		Parameters: qwenclient.ChatRequestParameters{
-			Temperature: o.Temperature,
-			TopP:        o.TopP,
-			TopK:        o.TopK,
-			MaxTokens:   o.MaxTokens,
+			Temperature: o.config.Temperature,
+			TopP:        o.config.TopP,
+			TopK:        o.config.TopK,
+			MaxTokens:   o.config.MaxTokens,
 		},
 	}
 
@@ -699,8 +720,8 @@ func (o *LLM) StreamingCall(ctx context.Context, prompt string, options ...llms.
 	// 发送流式请求
 	chunkChan, errChan, err := o.client.CreateChatStream(ctx, request)
 	if err != nil {
-		if o.CallbacksHandler != nil {
-			o.CallbacksHandler.HandleLLMError(ctx, err)
+		if callbackHandler != nil {
+			callbackHandler.HandleLLMError(ctx, err)
 		}
 		return nil, fmt.Errorf("%w: %v", ErrRequestFailed, err)
 	}
@@ -710,21 +731,23 @@ func (o *LLM) StreamingCall(ctx context.Context, prompt string, options ...llms.
 		ctx:              ctx,
 		chunkChan:        chunkChan,
 		errChan:          errChan,
-		callbacksHandler: o.CallbacksHandler,
+		callbacksHandler: callbackHandler,
 	}, nil
 }
 
 // StreamingGenerateContent 流式生成内容，支持多模态输入和工具调用
 func (o *LLM) StreamingGenerateContent(ctx context.Context, messages []llms.MessageContent, options ...llms.CallOption) (StreamingResponse, error) {
-	// 处理回调
-	if o.CallbacksHandler != nil {
-		o.CallbacksHandler.HandleLLMGenerateContentStart(ctx, messages)
-	}
-
 	// 解析选项
 	llmOptions := llms.CallOptions{}
 	for _, opt := range options {
 		opt(&llmOptions)
+	}
+
+	// 处理回调
+	callbackHandler := o.config.CallbacksHandler
+
+	if callbackHandler != nil {
+		callbackHandler.HandleLLMGenerateContentStart(ctx, messages)
 	}
 
 	// 转换消息格式
@@ -735,15 +758,15 @@ func (o *LLM) StreamingGenerateContent(ctx context.Context, messages []llms.Mess
 
 	// 构建请求参数
 	request := qwenclient.ChatRequest{
-		Model: o.QWenModel,
+		Model: o.config.Model,
 		Input: qwenclient.ChatRequestInput{
 			Messages: qwenMessages,
 		},
 		Parameters: qwenclient.ChatRequestParameters{
-			Temperature: o.Temperature,
-			TopP:        o.TopP,
-			TopK:        o.TopK,
-			MaxTokens:   o.MaxTokens,
+			Temperature: o.config.Temperature,
+			TopP:        o.config.TopP,
+			TopK:        o.config.TopK,
+			MaxTokens:   o.config.MaxTokens,
 		},
 	}
 
@@ -774,8 +797,8 @@ func (o *LLM) StreamingGenerateContent(ctx context.Context, messages []llms.Mess
 	// 发送流式请求
 	chunkChan, errChan, err := o.client.CreateChatStream(ctx, request)
 	if err != nil {
-		if o.CallbacksHandler != nil {
-			o.CallbacksHandler.HandleLLMError(ctx, err)
+		if callbackHandler != nil {
+			callbackHandler.HandleLLMError(ctx, err)
 		}
 		return nil, fmt.Errorf("%w: %v", ErrRequestFailed, err)
 	}
@@ -785,7 +808,7 @@ func (o *LLM) StreamingGenerateContent(ctx context.Context, messages []llms.Mess
 		ctx:              ctx,
 		chunkChan:        chunkChan,
 		errChan:          errChan,
-		callbacksHandler: o.CallbacksHandler,
+		callbacksHandler: callbackHandler,
 		toolCalls:        make([]llms.ToolCall, 0),
 	}, nil
 }
