@@ -9,8 +9,8 @@ import (
 	"github.com/sjzsdu/langchaingo-cn/llms/qwen"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/anthropic"
-	"github.com/tmc/langchaingo/llms/openai"
 	"github.com/tmc/langchaingo/llms/ollama"
+	"github.com/tmc/langchaingo/llms/openai"
 )
 
 // LLMType 表示LLM的类型
@@ -36,13 +36,9 @@ var ErrMissingRequiredParam = errors.New("缺少必要参数")
 // llmType: LLM类型
 // params: 创建LLM所需的参数，不同类型的LLM需要不同的参数
 //
-// 必要参数：
-// - DeepSeekLLM: "api_key"
-// - KimiLLM: "api_key"
-// - QwenLLM: "api_key"
-// - AnthropicLLM: "api_key"
-// - OpenAILLM: "api_key"
-// - OllamaLLM: "server_url"（默认为"http://localhost:11434"）
+// 常用参数：
+// - "api_key": API密钥（大多数LLM都需要）
+// - "server_url": 服务器URL（Ollama使用，默认为"http://localhost:11434"）
 //
 // 可选参数：
 // - "model": 模型名称
@@ -78,18 +74,14 @@ func CreateLLM(llmType LLMType, params map[string]interface{}) (llms.Model, erro
 
 // createDeepSeekLLM 创建DeepSeek LLM实例
 func createDeepSeekLLM(params map[string]interface{}) (*deepseek.LLM, error) {
-	// 检查必要参数
-	apiKey, ok := params["api_key"].(string)
-	if !ok || apiKey == "" {
-		return nil, fmt.Errorf("%w: api_key", ErrMissingRequiredParam)
-	}
-
 	// 构建选项
-	opts := []deepseek.Option{
-		deepseek.WithAPIKey(apiKey),
+	opts := []deepseek.Option{}
+
+	// 添加参数
+	if apiKey, ok := params["api_key"].(string); ok && apiKey != "" {
+		opts = append(opts, deepseek.WithAPIKey(apiKey))
 	}
 
-	// 添加可选参数
 	if model, ok := params["model"].(string); ok && model != "" {
 		opts = append(opts, deepseek.WithModel(model))
 	}
@@ -104,18 +96,14 @@ func createDeepSeekLLM(params map[string]interface{}) (*deepseek.LLM, error) {
 
 // createAnthropicLLM 创建Anthropic LLM实例
 func createAnthropicLLM(params map[string]interface{}) (llms.Model, error) {
-	// 检查必要参数
-	apiKey, ok := params["api_key"].(string)
-	if !ok || apiKey == "" {
-		return nil, fmt.Errorf("%w: api_key", ErrMissingRequiredParam)
-	}
-
 	// 构建选项
-	opts := []anthropic.Option{
-		anthropic.WithToken(apiKey),
+	opts := []anthropic.Option{}
+
+	// 添加参数
+	if apiKey, ok := params["api_key"].(string); ok && apiKey != "" {
+		opts = append(opts, anthropic.WithToken(apiKey))
 	}
 
-	// 添加可选参数
 	if model, ok := params["model"].(string); ok && model != "" {
 		opts = append(opts, anthropic.WithModel(model))
 	}
@@ -130,18 +118,14 @@ func createAnthropicLLM(params map[string]interface{}) (llms.Model, error) {
 
 // createKimiLLM 创建Kimi LLM实例
 func createKimiLLM(params map[string]interface{}) (*kimi.LLM, error) {
-	// 检查必要参数
-	apiKey, ok := params["api_key"].(string)
-	if !ok || apiKey == "" {
-		return nil, fmt.Errorf("%w: api_key", ErrMissingRequiredParam)
-	}
-
 	// 构建选项
-	opts := []kimi.Option{
-		kimi.WithToken(apiKey),
+	opts := []kimi.Option{}
+
+	// 添加参数
+	if apiKey, ok := params["api_key"].(string); ok && apiKey != "" {
+		opts = append(opts, kimi.WithToken(apiKey))
 	}
 
-	// 添加可选参数
 	if model, ok := params["model"].(string); ok && model != "" {
 		opts = append(opts, kimi.WithModel(model))
 	}
@@ -168,18 +152,14 @@ func createKimiLLM(params map[string]interface{}) (*kimi.LLM, error) {
 
 // createQwenLLM 创建Qwen LLM实例
 func createQwenLLM(params map[string]interface{}) (*qwen.LLM, error) {
-	// 检查必要参数
-	apiKey, ok := params["api_key"].(string)
-	if !ok || apiKey == "" {
-		return nil, fmt.Errorf("%w: api_key", ErrMissingRequiredParam)
-	}
-
 	// 构建选项
-	opts := []qwen.Option{
-		qwen.WithAPIKey(apiKey),
+	opts := []qwen.Option{}
+
+	// 添加参数
+	if apiKey, ok := params["api_key"].(string); ok && apiKey != "" {
+		opts = append(opts, qwen.WithAPIKey(apiKey))
 	}
 
-	// 添加可选参数
 	if model, ok := params["model"].(string); ok && model != "" {
 		opts = append(opts, qwen.WithModel(model))
 	}
@@ -214,18 +194,14 @@ func createQwenLLM(params map[string]interface{}) (*qwen.LLM, error) {
 
 // createOpenAILLM 创建OpenAI LLM实例
 func createOpenAILLM(params map[string]interface{}) (llms.Model, error) {
-	// 检查必要参数
-	apiKey, ok := params["api_key"].(string)
-	if !ok || apiKey == "" {
-		return nil, fmt.Errorf("%w: api_key", ErrMissingRequiredParam)
-	}
-
 	// 构建选项
-	opts := []openai.Option{
-		openai.WithToken(apiKey),
+	opts := []openai.Option{}
+
+	// 添加参数
+	if apiKey, ok := params["api_key"].(string); ok && apiKey != "" {
+		opts = append(opts, openai.WithToken(apiKey))
 	}
 
-	// 添加可选参数
 	if model, ok := params["model"].(string); ok && model != "" {
 		opts = append(opts, openai.WithModel(model))
 	}
