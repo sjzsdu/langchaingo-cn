@@ -272,7 +272,7 @@ func (o *LLM) GenerateContent(ctx context.Context, messages []llms.MessageConten
 	}
 
 	// 处理工具调用
-	if llmOptions.Tools != nil && len(llmOptions.Tools) > 0 {
+	if len(llmOptions.Tools) > 0 {
 		// 将[]llms.Tool转换为[]interface{}
 		toolsInterface := make([]interface{}, len(llmOptions.Tools))
 		for i, tool := range llmOptions.Tools {
@@ -295,7 +295,102 @@ func (o *LLM) GenerateContent(ctx context.Context, messages []llms.MessageConten
 		}
 	}
 
-	// 发送请求
+	// 检查是否启用流式输出
+	if llmOptions.StreamingFunc != nil {
+		// 启用流式输出
+		request.Parameters.IncrementalOutput = true
+
+		// 发送流式请求
+		chunkChan, errChan, err := o.client.CreateChatStream(ctx, request)
+		if err != nil {
+			if callbackHandler != nil {
+				callbackHandler.HandleLLMError(ctx, err)
+			}
+			return nil, fmt.Errorf("%w: %v", ErrRequestFailed, err)
+		}
+
+		// 处理流式响应
+		var fullContent strings.Builder
+		var toolCalls []llms.ToolCall
+
+		for {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case err := <-errChan:
+				if callbackHandler != nil {
+					callbackHandler.HandleLLMError(ctx, err)
+				}
+				return nil, fmt.Errorf("%w: %v", ErrRequestFailed, err)
+			case chunk, ok := <-chunkChan:
+				if !ok {
+					// 流结束
+					contentResponse := &llms.ContentResponse{
+						Choices: []*llms.ContentChoice{
+							{
+								Content:   fullContent.String(),
+								ToolCalls: toolCalls,
+							},
+						},
+					}
+
+					// 如果有工具调用，设置第一个工具调用到FuncCall字段
+					if len(toolCalls) > 0 {
+						contentResponse.Choices[0].FuncCall = toolCalls[0].FunctionCall
+					}
+
+					// 处理回调
+					if callbackHandler != nil {
+						callbackHandler.HandleLLMGenerateContentEnd(ctx, contentResponse)
+					}
+
+					return contentResponse, nil
+				}
+
+				// 处理文本块
+				if chunk.Output.Text != "" {
+					fullContent.WriteString(chunk.Output.Text)
+
+					// 调用流式回调函数
+					if err := llmOptions.StreamingFunc(ctx, []byte(chunk.Output.Text)); err != nil {
+						return nil, fmt.Errorf("流式回调函数错误: %w", err)
+					}
+				}
+
+				// 处理工具调用
+				if len(chunk.Output.ToolCalls) > 0 {
+					for _, tc := range chunk.Output.ToolCalls {
+						toolCall := llms.ToolCall{
+							ID:   tc.ID,
+							Type: tc.Type,
+							FunctionCall: &llms.FunctionCall{
+								Name:      tc.Function.Name,
+								Arguments: tc.Function.Arguments,
+							},
+						}
+
+						// 更新或添加工具调用
+						updated := false
+						for i, existingTC := range toolCalls {
+							if existingTC.ID == tc.ID {
+								// 更新现有工具调用
+								toolCalls[i] = toolCall
+								updated = true
+								break
+							}
+						}
+
+						if !updated {
+							// 添加新工具调用
+							toolCalls = append(toolCalls, toolCall)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// 发送非流式请求
 	response, err := o.client.CreateChat(ctx, request)
 	if err != nil {
 		if callbackHandler != nil {

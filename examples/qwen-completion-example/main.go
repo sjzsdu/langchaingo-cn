@@ -31,6 +31,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println("中国历史上最著名的发明:")
+	fmt.Println("你是个什么模型:")
 	fmt.Println(completion)
 }

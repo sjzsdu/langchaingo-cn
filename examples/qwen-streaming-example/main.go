@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 
 	"github.com/sjzsdu/langchaingo-cn/llms/qwen"
@@ -10,7 +11,6 @@ import (
 )
 
 func main() {
-	// 初始化通义千问客户端
 	llm, err := qwen.New()
 	if err != nil {
 		log.Fatal(err)
@@ -28,18 +28,30 @@ func main() {
 	fmt.Println("开始流式生成内容...\n")
 
 	// 使用StreamingGenerateContent方法获取流式响应
-	_, err = llm.GenerateContent(
+	stream, err := llm.StreamingGenerateContent(
 		ctx,
 		content,
 		llms.WithMaxTokens(1000),
 		llms.WithTemperature(0.7),
-		llms.WithStreamingFunc(func(_ context.Context, chunk []byte) error {
-			fmt.Print(string(chunk))
-			return nil
-		}),
 	)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("请求失败: %v", err)
 	}
+
+	// 从流中读取内容
+	for {
+		chunk, err := stream.GetChunk()
+		if err == io.EOF {
+			// 流结束
+			break
+		}
+		if err != nil {
+			log.Fatalf("读取流失败: %v", err)
+		}
+
+		// 打印文本块
+		fmt.Print(chunk)
+	}
+
 	fmt.Println("\n\n流式生成完成")
 }
