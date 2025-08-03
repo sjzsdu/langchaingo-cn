@@ -167,27 +167,6 @@ func createQwenLLM(params map[string]interface{}) (*qwen.LLM, error) {
 	if baseURL, ok := params["base_url"].(string); ok && baseURL != "" {
 		opts = append(opts, qwen.WithBaseURL(baseURL))
 	}
-
-	if temperature, ok := params["temperature"].(float64); ok {
-		opts = append(opts, qwen.WithTemperature(temperature))
-	}
-
-	if topP, ok := params["top_p"].(float64); ok {
-		opts = append(opts, qwen.WithTopP(topP))
-	}
-
-	if topK, ok := params["top_k"].(int); ok {
-		opts = append(opts, qwen.WithTopK(topK))
-	}
-
-	if maxTokens, ok := params["max_tokens"].(int); ok {
-		opts = append(opts, qwen.WithMaxTokens(maxTokens))
-	}
-
-	if useOpenAICompatible, ok := params["use_openai_compatible"].(bool); ok {
-		opts = append(opts, qwen.WithOpenAICompatible(useOpenAICompatible))
-	}
-
 	// 创建LLM实例
 	return qwen.New(opts...)
 }

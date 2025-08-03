@@ -8,7 +8,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/sjzsdu/langchaingo-cn/llms/deepseek"
+	cnllms "github.com/sjzsdu/langchaingo-cn/llms"
 	"github.com/tmc/langchaingo/llms"
 )
 
@@ -128,15 +128,17 @@ func (f *ToolFactory) ExecuteTool(name string, args map[string]interface{}) (int
 
 // 聊天服务，用于处理聊天请求和工具调用
 type ChatService struct {
-	llm          *deepseek.LLM
+	llm          llms.Model
 	toolFactory  *ToolFactory
 	systemPrompt string
+	modelName    string
 }
 
 // 创建新的聊天服务
-func NewChatService(llm *deepseek.LLM, toolFactory *ToolFactory, systemPrompt string) *ChatService {
+func NewChatService(llm llms.Model, modelName string, toolFactory *ToolFactory, systemPrompt string) *ChatService {
 	return &ChatService{
 		llm:          llm,
+		modelName:    modelName,
 		toolFactory:  toolFactory,
 		systemPrompt: systemPrompt,
 	}
@@ -149,6 +151,8 @@ func (s *ChatService) HandleChat(ctx context.Context, userPrompt string) (string
 		llms.TextParts(llms.ChatMessageTypeSystem, s.systemPrompt),
 		llms.TextParts(llms.ChatMessageTypeHuman, userPrompt),
 	}
+
+	fmt.Printf("\n===== 使用 %s 模型进行工具调用 =====\n\n", s.modelName)
 
 	// 生成内容并处理工具调用
 	completion, err := s.llm.GenerateContent(
@@ -252,10 +256,10 @@ func (s *ChatService) handleToolCalls(ctx context.Context, userPrompt string, to
 }
 
 func main() {
-	// 初始化DeepSeek客户端
-	llm, err := deepseek.New()
+	// 初始化所有模型
+	models, modelNames, err := cnllms.InitTextModels()
 	if err != nil {
-		log.Fatal("初始化DeepSeek客户端失败: ", err)
+		log.Fatal("初始化模型失败: ", err)
 	}
 
 	ctx := context.Background()
@@ -266,18 +270,27 @@ func main() {
 	// 注册天气工具
 	toolFactory.RegisterTool("get_weather", &WeatherTool{})
 
-	// 创建聊天服务
+	// 系统提示
 	systemPrompt := "你是一个旅行助手，可以帮助用户查询天气信息并提供相应的旅行建议。"
-	chatService := NewChatService(llm, toolFactory, systemPrompt)
 
-	// 处理用户请求
+	// 用户提示
 	userPrompt := "我想知道北京明天的天气如何，我应该准备什么衣物？"
-	response, err := chatService.HandleChat(ctx, userPrompt)
-	if err != nil {
-		log.Fatal("处理聊天请求失败: ", err)
-	}
 
-	// 输出回复
-	fmt.Println("最终回复:")
-	fmt.Println(response)
+	// 依次使用每个模型进行工具调用
+	for i, llm := range models {
+		// 创建聊天服务
+		chatService := NewChatService(llm, modelNames[i], toolFactory, systemPrompt)
+
+		// 处理用户请求
+		response, err := chatService.HandleChat(ctx, userPrompt)
+		if err != nil {
+			fmt.Printf("使用 %s 处理聊天请求失败: %v\n\n", modelNames[i], err)
+			continue
+		}
+
+		// 输出回复
+		fmt.Println("最终回复:")
+		fmt.Println(response)
+		fmt.Println("\n-----------------------------------\n")
+	}
 }
