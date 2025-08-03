@@ -4,14 +4,19 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	cnllms "github.com/sjzsdu/langchaingo-cn/llms"
 	"github.com/tmc/langchaingo/llms"
 )
 
 func main() {
+	llm := ""
+	if len(os.Args) > 1 {
+		llm = os.Args[1]
+	}
 	// 初始化所有模型
-	models, modelNames, err := cnllms.InitTextModels()
+	models, modelNames, err := cnllms.InitTextModels(llm)
 	if err != nil {
 		log.Fatal(err)
 	}

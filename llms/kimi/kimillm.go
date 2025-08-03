@@ -4,6 +4,7 @@ package kimi
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -238,11 +239,13 @@ func (o *LLM) GenerateContent(ctx context.Context, messages []llms.MessageConten
 
 	// 构建请求参数
 	request := kimiclient.ChatRequest{
-		Model:       o.config.Model,
-		Messages:    kimiMessages,
-		Temperature: o.config.Temperature,
-		TopP:        o.config.TopP,
-		MaxTokens:   o.config.MaxTokens,
+		Model:         o.config.Model,
+		Messages:      kimiMessages,
+		Temperature:   o.config.Temperature,
+		TopP:          o.config.TopP,
+		MaxTokens:     o.config.MaxTokens,
+		Stream:        llmOptions.StreamingFunc != nil,
+		StreamingFunc: llmOptions.StreamingFunc,
 	}
 
 	// 处理工具调用
@@ -292,8 +295,85 @@ func (o *LLM) GenerateContent(ctx context.Context, messages []llms.MessageConten
 	}
 
 	// 处理工具调用
-	// 这里需要根据Kimi的API响应格式进行适配
-	// 暂时不实现工具调用的处理
+	if response.Choices[0].Message.ToolCalls != nil {
+		var toolCalls []interface{}
+
+		// 处理不同格式的工具调用响应
+		switch tc := response.Choices[0].Message.ToolCalls.(type) {
+		case []interface{}:
+			// 直接使用数组
+			toolCalls = tc
+		case map[string]interface{}:
+			// 如果是单个工具调用，包装为数组
+			toolCalls = []interface{}{tc}
+		default:
+			// 尝试通过JSON转换
+			tcBytes, err := json.Marshal(response.Choices[0].Message.ToolCalls)
+			if err != nil {
+				return nil, fmt.Errorf("无法序列化工具调用: %w", err)
+			}
+
+			if err := json.Unmarshal(tcBytes, &toolCalls); err != nil {
+				// 尝试作为单个对象解析
+				var singleToolCall map[string]interface{}
+				if err := json.Unmarshal(tcBytes, &singleToolCall); err != nil {
+					return nil, fmt.Errorf("无法解析工具调用: %w", err)
+				}
+				toolCalls = []interface{}{singleToolCall}
+			}
+		}
+
+		// 处理工具调用
+		if len(toolCalls) > 0 {
+			contentResponse.Choices[0].ToolCalls = make([]llms.ToolCall, 0, len(toolCalls))
+			for _, tc := range toolCalls {
+				toolCall, ok := tc.(map[string]interface{})
+				if !ok {
+					continue
+				}
+
+				id, _ := toolCall["id"].(string)
+				typeStr, _ := toolCall["type"].(string)
+				if typeStr == "" {
+					// 默认为function类型
+					typeStr = "function"
+				}
+
+				// 处理函数调用
+				if typeStr == "function" && toolCall["function"] != nil {
+					function, ok := toolCall["function"].(map[string]interface{})
+					if !ok {
+						continue
+					}
+
+					name, _ := function["name"].(string)
+
+					// 处理参数，可能是字符串或对象
+					var arguments string
+					switch args := function["arguments"].(type) {
+					case string:
+						// 直接使用字符串
+						arguments = args
+					default:
+						// 尝试将对象转换为JSON字符串
+						argsBytes, err := json.Marshal(args)
+						if err == nil {
+							arguments = string(argsBytes)
+						}
+					}
+
+					contentResponse.Choices[0].ToolCalls = append(contentResponse.Choices[0].ToolCalls, llms.ToolCall{
+						ID:   id,
+						Type: typeStr,
+						FunctionCall: &llms.FunctionCall{
+							Name:      name,
+							Arguments: arguments,
+						},
+					})
+				}
+			}
+		}
+	}
 
 	// 处理回调
 	if callbackHandler != nil {
@@ -340,15 +420,33 @@ func convertToKimiMessages(messages []llms.MessageContent) ([]kimiclient.ChatMes
 
 			// 处理工具调用响应
 			if toolCallResponse, ok := message.Parts[0].(llms.ToolCallResponse); ok {
-				// 构建工具响应
-				toolResponse := map[string]interface{}{
-					"type":         "tool_response",
-					"tool_call_id": toolCallResponse.ToolCallID,
-					"content":      toolCallResponse.Content,
-				}
+				// Kimi API 期望工具响应消息的 Content 字段为字符串，tool_calls 字段为数组
 				kimiMessages = append(kimiMessages, kimiclient.ChatMessage{
 					Role:    role,
-					Content: toolResponse,
+					Content: toolCallResponse.Content,
+				})
+				continue
+			}
+			
+			// 处理工具调用
+			if toolCall, ok := message.Parts[0].(llms.ToolCall); ok {
+				// 构建工具调用
+				toolCalls := []map[string]interface{}{
+					{
+						"id":   toolCall.ID,
+						"type": toolCall.Type,
+						"function": map[string]interface{}{
+							"name":      toolCall.FunctionCall.Name,
+							"arguments": toolCall.FunctionCall.Arguments,
+						},
+					},
+				}
+				
+				// Kimi API 要求 assistant 消息必须设置 content 和 tool_calls 字段
+				kimiMessages = append(kimiMessages, kimiclient.ChatMessage{
+					Role:      role,
+					Content:   " ", // 设置为空格字符串而不是空字符串，确保 content 字段不为空
+					ToolCalls: toolCalls,
 				})
 				continue
 			}
@@ -396,15 +494,47 @@ func convertToKimiMessages(messages []llms.MessageContent) ([]kimiclient.ChatMes
 
 // convertTools 将LangChain工具转换为Kimi工具
 func convertTools(tools []llms.Tool) ([]kimiclient.Tool, error) {
+	// 根据Moonshot AI文档，工具数量不得超过128个
+	if len(tools) > 128 {
+		return nil, fmt.Errorf("工具数量不得超过128个，当前: %d", len(tools))
+	}
+
 	kimiTools := make([]kimiclient.Tool, 0, len(tools))
 
 	for _, tool := range tools {
+		// 验证工具名称是否符合规范 (^[a-zA-Z_][a-zA-Z0-9-_]63$)
+		if len(tool.Function.Name) > 64 {
+			return nil, fmt.Errorf("工具名称长度不得超过64个字符: %s", tool.Function.Name)
+		}
+
+		// 确保parameters字段是一个object
+		params, ok := tool.Function.Parameters.(map[string]interface{})
+		if !ok {
+			// 尝试将其他格式转换为map
+			paramsBytes, err := json.Marshal(tool.Function.Parameters)
+			if err != nil {
+				return nil, fmt.Errorf("无法序列化工具参数: %w", err)
+			}
+
+			var paramsMap map[string]interface{}
+			if err := json.Unmarshal(paramsBytes, &paramsMap); err != nil {
+				return nil, fmt.Errorf("工具参数必须是一个object: %w", err)
+			}
+
+			// 确保root是一个object
+			if paramsMap["type"] != "object" {
+				return nil, fmt.Errorf("工具参数的root必须是一个object")
+			}
+
+			params = paramsMap
+		}
+
 		kimiTools = append(kimiTools, kimiclient.Tool{
 			Type: "function",
 			Function: kimiclient.FunctionDefinition{
 				Name:        tool.Function.Name,
 				Description: tool.Function.Description,
-				Parameters:  tool.Function.Parameters,
+				Parameters:  params,
 			},
 		})
 	}
@@ -529,8 +659,102 @@ func (s *streamingContentResponse) GetChunk() (string, error) {
 			}
 
 			// 处理工具调用
-			// 这里需要根据Kimi的API响应格式进行适配
-			// 暂时不实现工具调用的处理
+			var toolCallsData []interface{}
+			switch tc := chunk.Choices[0].Delta["tool_calls"].(type) {
+			case []interface{}:
+				// 直接使用数组
+				toolCallsData = tc
+			case map[string]interface{}:
+				// 如果是单个工具调用，包装为数组
+				toolCallsData = []interface{}{tc}
+			default:
+				// 尝试通过JSON转换
+				if chunk.Choices[0].Delta["tool_calls"] != nil {
+					tcBytes, err := json.Marshal(chunk.Choices[0].Delta["tool_calls"])
+					if err == nil {
+						if err := json.Unmarshal(tcBytes, &toolCallsData); err != nil {
+							// 尝试作为单个对象解析
+							var singleToolCall map[string]interface{}
+							if err := json.Unmarshal(tcBytes, &singleToolCall); err == nil {
+								toolCallsData = []interface{}{singleToolCall}
+							}
+						}
+					}
+				}
+			}
+
+			if len(toolCallsData) > 0 {
+				// 初始化工具调用列表（如果需要）
+				if s.toolCalls == nil {
+					s.toolCalls = make([]llms.ToolCall, 0)
+				}
+
+				// 处理每个工具调用
+				for _, tc := range toolCallsData {
+					toolCall, ok := tc.(map[string]interface{})
+					if !ok {
+						continue
+					}
+
+					// 获取工具调用的索引
+					var idx int
+					if index, ok := toolCall["index"].(float64); ok {
+						idx = int(index)
+					} else {
+						// 如果没有索引，使用当前长度
+						idx = len(s.toolCalls)
+					}
+
+					// 确保工具调用列表有足够的空间
+					for len(s.toolCalls) <= idx {
+						s.toolCalls = append(s.toolCalls, llms.ToolCall{
+							Type:         "function",
+							FunctionCall: &llms.FunctionCall{},
+						})
+					}
+
+					// 更新ID
+					if id, ok := toolCall["id"].(string); ok {
+						s.toolCalls[idx].ID = id
+					}
+
+					// 更新类型
+					if typeStr, ok := toolCall["type"].(string); ok {
+						s.toolCalls[idx].Type = typeStr
+					}
+
+					// 处理函数调用
+					if function, ok := toolCall["function"].(map[string]interface{}); ok {
+						// 确保 FunctionCall 已初始化
+						if s.toolCalls[idx].FunctionCall == nil {
+							s.toolCalls[idx].FunctionCall = &llms.FunctionCall{}
+						}
+
+						// 更新函数名称
+						if name, ok := function["name"].(string); ok {
+							s.toolCalls[idx].FunctionCall.Name = name
+						}
+
+						// 更新函数参数
+						switch args := function["arguments"].(type) {
+						case string:
+							// 对于流式响应，可能需要累积参数
+							s.toolCalls[idx].FunctionCall.Arguments += args
+						default:
+							// 尝试将对象转换为JSON字符串
+							if function["arguments"] != nil {
+								argsBytes, err := json.Marshal(function["arguments"])
+								if err == nil {
+									s.toolCalls[idx].FunctionCall.Arguments += string(argsBytes)
+								}
+							}
+						}
+					}
+				}
+
+				// 更新当前选择的工具调用
+				s.currentChoice.ToolCalls = s.toolCalls
+			}
 		}
 
 		return content, nil

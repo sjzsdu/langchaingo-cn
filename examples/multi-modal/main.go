@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	cnllms "github.com/sjzsdu/langchaingo-cn/llms"
@@ -72,8 +73,13 @@ func runMultiModalExample(llm llms.Model, modelName string) {
 }
 
 func main() {
+	// 获取命令行参数，如果有的话指定特定模型
+	llm := ""
+	if len(os.Args) > 1 {
+		llm = os.Args[1]
+	}
 
-	models, modelNames, err := cnllms.InitImageModels()
+	models, modelNames, err := cnllms.InitImageModels(llm)
 	if err != nil {
 		log.Fatal("初始化模型失败: ", err)
 	}

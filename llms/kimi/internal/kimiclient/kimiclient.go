@@ -88,8 +88,9 @@ type ChatRequest struct {
 
 // ChatMessage 是聊天消息
 type ChatMessage struct {
-	Role    string      `json:"role"`
-	Content interface{} `json:"content"`
+	Role      string      `json:"role"`
+	Content   interface{} `json:"content"`
+	ToolCalls interface{} `json:"tool_calls,omitempty"`
 }
 
 // Tool 是工具定义
