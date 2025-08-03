@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	cnllms "github.com/sjzsdu/langchaingo-cn/llms"
@@ -256,8 +257,14 @@ func (s *ChatService) handleToolCalls(ctx context.Context, userPrompt string, to
 }
 
 func main() {
+	// 获取命令行参数，如果有的话指定特定模型
+	llm := ""
+	if len(os.Args) > 1 {
+		llm = os.Args[1]
+	}
+
 	// 初始化所有模型
-	models, modelNames, err := cnllms.InitTextModels()
+	models, modelNames, err := cnllms.InitTextModels(llm)
 	if err != nil {
 		log.Fatal("初始化模型失败: ", err)
 	}
