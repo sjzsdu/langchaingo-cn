@@ -1,22 +1,29 @@
 # LangChainGo-CN
 
-这个项目是对[LangChainGo](https://github.com/tmc/langchaingo)的扩展，主要实现了中国大模型厂商的接口集成。
+[![Go Reference](https://pkg.go.dev/badge/github.com/sjzsdu/langchaingo-cn.svg)](https://pkg.go.dev/github.com/sjzsdu/langchaingo-cn)
+
+LangChainGo-CN 是一个基于 [LangChainGo](https://github.com/tmc/langchaingo) 的扩展库，专为中文开发者提供对国内主流大语言模型的支持。该库提供了简单统一的接口，让您可以轻松地与多种中文大语言模型进行交互。
 
 ## 支持的模型
 
-- DeepSeek
-- QWen
-- 更多模型正在添加中...
+目前支持以下模型：
 
-## 支持的功能
+- **DeepSeek**：深度求索AI的大语言模型
+- **Qwen**：阿里云通义千问大语言模型
+- **Kimi**：Moonshot AI的Kimi大语言模型
 
-### DeepSeek
+同时，通过底层的LangChainGo库，也支持：
 
-- 基本文本生成
-- 多轮对话
-- 流式输出（Streaming）
-- 工具调用（Function Calling）
-- 多模态输入（图像输入）
+- **OpenAI**：包括GPT系列模型
+- **Anthropic**：Claude系列模型
+- **Ollama**：本地部署的开源模型
+
+## 功能特性
+
+- **统一接口**：提供一致的API接口，轻松切换不同的模型
+- **多模态支持**：支持图像和文本的多模态输入和处理
+- **流式响应**：支持流式生成，实时获取模型响应
+- **工具调用**：支持函数调用功能，让模型能够调用外部工具和API
 
 ## 安装
 
@@ -24,11 +31,9 @@
 go get github.com/sjzsdu/langchaingo-cn
 ```
 
-## 使用方法
+## 快速开始
 
-### DeepSeek
-
-#### 基本调用
+### 基本文本生成
 
 ```go
 package main
@@ -36,97 +41,55 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
 
-	"github.com/sjzsdu/langchaingo-cn/llms/deepseek"
-)
-
-func main() {
-	llm, err := deepseek.New(
-		deepseek.WithAPIKey("your-api-key"),
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	ctx := context.Background()
-	response, err := llm.Call(ctx, "你好，请介绍一下你自己")
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(response)
-}
-```
-
-#### 使用GenerateContent方法
-
-```go
-package main
-
-import (
-	"context"
-	"fmt"
-
-	"github.com/sjzsdu/langchaingo-cn/llms/deepseek"
+	cnllms "github.com/sjzsdu/langchaingo-cn/llms"
 	"github.com/tmc/langchaingo/llms"
 )
 
 func main() {
-	model, err := deepseek.New(
-		deepseek.WithAPIKey("your-api-key"),
-	)
+	// 初始化所有模型或指定模型
+	models, modelNames, err := cnllms.InitTextModels("") // 传入空字符串初始化所有模型
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	ctx := context.Background()
+	prompt := "你是什么模型？"
 
-	// 创建消息内容
-	messages := []llms.MessageContent{
-		{
-			Role: llms.ChatMessageTypeSystem,
-			Parts: []llms.ContentPart{
-				llms.TextContent{Text: "你是一个专业的Go语言助手"},
-			},
-		},
-		{
-			Role: llms.ChatMessageTypeHuman,
-			Parts: []llms.ContentPart{
-				llms.TextContent{Text: "Go语言中，如何实现接口？"},
-			},
-		},
+	// 依次使用每个模型生成回复
+	for i, llm := range models {
+		fmt.Printf("\n===== 使用 %s 模型 =====\n", modelNames[i])
+
+		completion, err := llms.GenerateFromSinglePrompt(
+			ctx,
+			llm,
+			prompt,
+			llms.WithTemperature(0.7),
+			llms.WithMaxTokens(1000),
+		)
+		if err != nil {
+			fmt.Printf("使用 %s 生成失败: %v\n", modelNames[i], err)
+			continue
+		}
+
+		fmt.Printf("回复:\n%s\n", completion)
 	}
-
-	// 设置选项
-	options := []llms.CallOption{
-		llms.WithTemperature(0.7),
-		llms.WithMaxTokens(1000),
-	}
-
-	// 调用GenerateContent方法
-	response, err := model.GenerateContent(ctx, messages, options...)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(response.Choices[0].Content)
 }
 ```
 
-#### 使用工具调用（Function Calling）
-
-DeepSeek模型支持工具调用（Function Calling）功能，可以让模型根据用户的输入调用预定义的工具函数，并根据工具函数的返回结果生成最终回复。以下是一个使用天气查询工具的完整示例：
+### 工具调用示例
 
 ```go
 package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 
-	"github.com/sjzsdu/langchaingo-cn/llms/deepseek"
+	cnllms "github.com/sjzsdu/langchaingo-cn/llms"
 	"github.com/tmc/langchaingo/llms"
 )
 
@@ -166,196 +129,105 @@ func (w *WeatherTool) GetDefinition() llms.Tool {
 	}
 }
 
-// 执行天气工具
-func (w *WeatherTool) Execute(args map[string]interface{}) (interface{}, error) {
-	// 这里简化实现，返回模拟数据
-	return map[string]interface{}{
-		"temperature": 23.5,
-		"condition":   "晴朗",
-		"humidity":    65,
-	}, nil
-}
+// 主函数
+func main() {
+	// 初始化模型
+	models, modelNames, err := cnllms.InitTextModels("")
+	if err != nil {
+		log.Fatal(err)
+	}
 
-// 工具工厂，用于管理和注册工具
-type ToolFactory struct {
-	tools map[string]Tool
-}
+	// 创建工具
+	weatherTool := &WeatherTool{}
 
-// 创建新的工具工厂
-func NewToolFactory() *ToolFactory {
-	return &ToolFactory{
-		tools: make(map[string]Tool),
+	// 使用模型和工具
+	for i, model := range models {
+		// 处理工具调用
+		handleToolCalls(model, modelNames[i], weatherTool)
 	}
 }
+```
 
-// 注册工具
-func (f *ToolFactory) RegisterTool(name string, tool Tool) {
-	f.tools[name] = tool
-}
+### 多模态示例
 
-// 获取工具定义列表
-func (f *ToolFactory) GetToolDefinitions() []llms.Tool {
-	definitions := make([]llms.Tool, 0, len(f.tools))
-	for _, tool := range f.tools {
-		definitions = append(definitions, tool.GetDefinition())
-	}
-	return definitions
-}
+```go
+package main
 
-// 执行工具
-func (f *ToolFactory) ExecuteTool(name string, args map[string]interface{}) (interface{}, error) {
-	tool, exists := f.tools[name]
-	if !exists {
-		return nil, fmt.Errorf("工具未找到: %s", name)
-	}
-	return tool.Execute(args)
-}
+import (
+	"context"
+	"fmt"
+	"log"
+
+	cnllms "github.com/sjzsdu/langchaingo-cn/llms"
+	"github.com/tmc/langchaingo/llms"
+)
 
 func main() {
-	// 初始化DeepSeek客户端
-	llm, err := deepseek.New(
-		deepseek.WithAPIKey("your-api-key"),
-	)
+	// 初始化多模态模型
+	models, modelNames, err := cnllms.InitImageModels("")
 	if err != nil {
-		log.Fatal("初始化DeepSeek客户端失败: ", err)
+		log.Fatal(err)
 	}
 
 	ctx := context.Background()
-
-	// 创建工具工厂
-	toolFactory := NewToolFactory()
-
-	// 注册天气工具
-	toolFactory.RegisterTool("get_weather", &WeatherTool{})
-
-	// 创建聊天消息
-	systemPrompt := "你是一个旅行助手，可以帮助用户查询天气信息并提供相应的旅行建议。"
-	userPrompt := "我想知道北京明天的天气如何，我应该准备什么衣物？"
-
-	content := []llms.MessageContent{
-		llms.TextParts(llms.ChatMessageTypeSystem, systemPrompt),
-		llms.TextParts(llms.ChatMessageTypeHuman, userPrompt),
-	}
-
-	// 生成内容并处理工具调用
-	completion, err := llm.GenerateContent(
-		ctx,
-		content,
-		llms.WithMaxTokens(1000),
-		llms.WithTemperature(0.7),
-		llms.WithTools(toolFactory.GetToolDefinitions()),
-	)
-	if err != nil {
-		log.Fatal("生成内容失败: ", err)
-	}
-
-	// 处理工具调用
-	if len(completion.Choices) > 0 && len(completion.Choices[0].ToolCalls) > 0 {
-		// 获取第一个工具调用
-		toolCall := completion.Choices[0].ToolCalls[0]
-		fmt.Printf("模型请求调用工具: %s\n", toolCall.FunctionCall.Name)
-		fmt.Printf("参数: %s\n", toolCall.FunctionCall.Arguments)
-
-		// 解析参数
-		var args map[string]interface{}
-		if err := json.Unmarshal([]byte(toolCall.FunctionCall.Arguments), &args); err != nil {
-			log.Fatal("解析参数失败: ", err)
-		}
-
-		// 执行工具
-		result, err := toolFactory.ExecuteTool(toolCall.FunctionCall.Name, args)
-		if err != nil {
-			log.Fatal("执行工具失败: ", err)
-		}
-
-		// 将结果转换为JSON
-		resultJSON, err := json.Marshal(result)
-		if err != nil {
-			log.Fatal("序列化结果失败: ", err)
-		}
-
-		fmt.Printf("工具返回结果: %s\n\n", string(resultJSON))
-
-		// 将工具调用结果发送回模型
-		toolResult := []llms.MessageContent{
-			llms.TextParts(llms.ChatMessageTypeSystem, systemPrompt),
-			llms.TextParts(llms.ChatMessageTypeHuman, userPrompt),
-			// 助手消息包含工具调用
-			{
-				Role: llms.ChatMessageTypeAI,
-				Parts: []llms.ContentPart{
-					// 添加工具调用
-					llms.ToolCall{
-						ID:   toolCall.ID,
-						Type: "function",
-						FunctionCall: &llms.FunctionCall{
-							Name:      toolCall.FunctionCall.Name,
-							Arguments: toolCall.FunctionCall.Arguments,
-						},
-					},
+	
+	// 创建多模态消息内容
+	imageURL := "https://example.com/image.jpg"
+	messages := []llms.MessageContent{
+		{
+			Role: llms.ChatMessageTypeSystem,
+			Parts: []llms.ContentPart{
+				llms.TextContent{
+					Text: "你是一个专业的图像分析助手，擅长分析图像内容并提供详细描述。",
 				},
 			},
-			// 工具响应消息
-			{
-				Role: llms.ChatMessageTypeTool,
-				Parts: []llms.ContentPart{
-					llms.ToolCallResponse{
-						Content:    string(resultJSON),
-						ToolCallID: toolCall.ID,
-						Name:       toolCall.FunctionCall.Name,
-					},
-				},
+		},
+		{
+			Role: llms.ChatMessageTypeHuman,
+			Parts: []llms.ContentPart{
+				llms.ImageURLWithDetailPart(imageURL, "这张图片是什么？请简要描述一下图片中的内容。"),
 			},
-		}
+		},
+	}
 
-		// 获取最终回复
-		finalResponse, err := llm.GenerateContent(ctx, toolResult, llms.WithMaxTokens(1000))
+	// 使用模型分析图像
+	for i, model := range models {
+		fmt.Printf("\n===== 使用 %s 模型进行多模态分析 =====\n\n", modelNames[i])
+		
+		response, err := llms.GenerateContent(ctx, model, messages)
 		if err != nil {
-			log.Fatal("获取最终回复失败: ", err)
+			fmt.Printf("使用 %s 分析失败: %v\n", modelNames[i], err)
+			continue
 		}
-
-		// 输出最终回复
-		if len(finalResponse.Choices) > 0 {
-			fmt.Println("最终回复:")
-			fmt.Println(finalResponse.Choices[0].Content)
-		}
-	} else {
-		// 直接返回回复
-		if len(completion.Choices) > 0 {
-			fmt.Println("模型回复:")
-			fmt.Println(completion.Choices[0].Content)
-		}
+		
+		fmt.Printf("分析结果:\n%s\n", response.Content)
 	}
 }
 ```
 
-## 注意事项与最佳实践
+## 环境变量配置
 
-### 工具调用（Function Calling）
+使用前需要设置相应的API密钥环境变量：
 
-- 工具定义应尽可能详细，包括清晰的描述和参数说明，这有助于模型正确理解和使用工具。
-- 处理工具调用时，确保正确处理错误情况，如参数解析错误、工具执行错误等。
-- 在将工具调用结果发送回模型时，确保消息格式正确，特别是助手消息的格式。
-- 对于复杂的工具调用场景，可以实现多轮工具调用，即模型可以根据前一个工具的结果决定是否调用下一个工具。
+- DeepSeek: `DEEPSEEK_API_KEY`
+- Qwen: `QWEN_API_KEY`
+- Kimi: `KIMI_API_KEY`
+- OpenAI: `OPENAI_API_KEY`
+- Anthropic: `ANTHROPIC_API_KEY`
 
-### API密钥管理
+## 高级配置
 
-- 推荐使用环境变量管理API密钥，避免硬编码在代码中。
-- 可以设置`DEEPSEEK_API_KEY`环境变量，库会自动读取。
+可以通过以下参数自定义模型行为：
 
-```bash
-export DEEPSEEK_API_KEY="your-api-key"
-```
+- `WithTemperature`: 控制生成文本的随机性
+- `WithMaxTokens`: 设置生成文本的最大长度
+- `WithTopP`: 控制生成文本的多样性
+- `WithTopK`: 控制生成文本的多样性（仅部分模型支持）
 
-## 示例代码
+## 贡献
 
-完整的示例代码可以在[examples](./examples)目录中找到：
-
-- [基本调用示例](./examples/deepseek-completion-example)
-- [流式输出示例](./examples/deepseek-streaming-example)
-- [工具调用示例](./examples/deepseek-tool-call-example)
-- [多模态输入示例](./examples/deepseek-multimodal-example)
+欢迎提交问题和拉取请求！
 
 ## 许可证
 
-MIT
+本项目采用 [MIT 许可证](LICENSE)。
