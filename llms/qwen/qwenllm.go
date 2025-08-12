@@ -12,11 +12,15 @@ const (
 	// 环境变量名
 	TokenEnvVarName = "QWEN_API_KEY" //nolint:gosec
 	ModelEnvVarName = "QWEN_MODEL"   //nolint:gosec
+	// Embedding 环境变量
+	EmbeddingModelEnvVarName = "QWEN_EMBEDDING_MODEL" //nolint:gosec
 
 	// OpenAI兼容模式基础URL
 	OpenAICompatibleBaseURL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 	// 默认模型
 	DefaultModel = "qwen-max"
+	// 默认 Embedding 模型（DashScope）
+	DefaultEmbeddingModel = "text-embedding-v1"
 )
 
 const (
@@ -46,9 +50,10 @@ type Option func(*options)
 
 // options 是LLM的配置选项
 type options struct {
-	apiKey  string
-	baseURL string
-	model   string
+	apiKey         string
+	baseURL        string
+	model          string
+	embeddingModel string
 }
 
 // WithAPIKey 设置API密钥
@@ -72,11 +77,19 @@ func WithModel(model string) Option {
 	}
 }
 
+// WithEmbeddingModel sets embedding model for CreateEmbedding
+func WithEmbeddingModel(model string) Option {
+	return func(o *options) {
+		o.embeddingModel = model
+	}
+}
+
 // defaultOptions 返回默认选项
 func defaultOptions() options {
 	return options{
-		apiKey: os.Getenv(TokenEnvVarName),
-		model:  getEnvOrDefault(ModelEnvVarName, DefaultModel),
+		apiKey:         os.Getenv(TokenEnvVarName),
+		model:          getEnvOrDefault(ModelEnvVarName, DefaultModel),
+		embeddingModel: getEnvOrDefault(EmbeddingModelEnvVarName, DefaultEmbeddingModel),
 	}
 }
 
@@ -108,6 +121,7 @@ func New(opts ...Option) (*LLM, error) {
 		openai.WithToken(options.apiKey),
 		openai.WithModel(options.model),
 		openai.WithBaseURL(OpenAICompatibleBaseURL),
+		openai.WithEmbeddingModel(options.embeddingModel),
 	}
 
 	openaiLLM, err := openai.New(openaiOpts...)

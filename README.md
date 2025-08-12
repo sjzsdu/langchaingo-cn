@@ -205,15 +205,55 @@ func main() {
 }
 ```
 
+### 向量/Embedding 示例
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+
+	cnllms "github.com/sjzsdu/langchaingo-cn/llms"
+)
+
+func main() {
+	models, names, err := cnllms.InitEmbeddingModels("") // 传入名称可筛选：OpenAI/Ollama/HuggingFace
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ctx := context.Background()
+	texts := []string{"Hello world", "LangChain Go is great", "向量检索可以加速语义搜索"}
+
+	for i, m := range models {
+		fmt.Printf("\n===== 使用 %s Embedding =====\n", names[i])
+		embs, err := m.EmbedDocuments(ctx, texts)
+		if err != nil {
+			fmt.Printf("使用 %s 生成向量失败: %v\n", names[i], err)
+			continue
+		}
+		if len(embs) == 0 {
+			fmt.Printf("%s 返回空向量\n", names[i])
+			continue
+		}
+		fmt.Printf("输入条数: %d, 向量维度: %d\n", len(embs), len(embs[0]))
+	}
+}
+```
+
 ## 环境变量配置
 
 使用前需要设置相应的API密钥环境变量：
 
 - DeepSeek: `DEEPSEEK_API_KEY`
-- Qwen: `QWEN_API_KEY`
+- Qwen: `QWEN_API_KEY`（可选 `QWEN_MODEL`、`QWEN_EMBEDDING_MODEL`）
 - Kimi: `KIMI_API_KEY`
 - OpenAI: `OPENAI_API_KEY`
 - Anthropic: `ANTHROPIC_API_KEY`
+- HuggingFace: `HF_TOKEN` 或 `HUGGINGFACEHUB_API_TOKEN`
+- Ollama: 本地服务 `http://localhost:11434`（示例默认使用 `bge-m3`）
 
 ## 高级配置
 
