@@ -74,14 +74,13 @@ func CreateLLM(llmType LLMType, params map[string]interface{}) (llms.Model, erro
 
 // createDeepSeekLLM 创建DeepSeek LLM实例
 func createDeepSeekLLM(params map[string]interface{}) (*deepseek.LLM, error) {
-	// 必填校验
-	apiKey, _ := params["api_key"].(string)
-	if apiKey == "" {
-		return nil, ErrMissingRequiredParam
-	}
-
 	// 构建选项
-	opts := []deepseek.Option{deepseek.WithAPIKey(apiKey)}
+	opts := []deepseek.Option{}
+
+	// 添加参数
+	if apiKey, ok := params["api_key"].(string); ok && apiKey != "" {
+		opts = append(opts, deepseek.WithAPIKey(apiKey))
+	}
 
 	if model, ok := params["model"].(string); ok && model != "" {
 		opts = append(opts, deepseek.WithModel(model))
@@ -119,14 +118,13 @@ func createAnthropicLLM(params map[string]interface{}) (llms.Model, error) {
 
 // createKimiLLM 创建Kimi LLM实例
 func createKimiLLM(params map[string]interface{}) (*kimi.LLM, error) {
-	// 必填校验
-	apiKey, _ := params["api_key"].(string)
-	if apiKey == "" {
-		return nil, ErrMissingRequiredParam
-	}
-
 	// 构建选项
-	opts := []kimi.Option{kimi.WithToken(apiKey)}
+	opts := []kimi.Option{}
+
+	// 添加参数
+	if apiKey, ok := params["api_key"].(string); ok && apiKey != "" {
+		opts = append(opts, kimi.WithToken(apiKey))
+	}
 
 	if model, ok := params["model"].(string); ok && model != "" {
 		opts = append(opts, kimi.WithModel(model))
@@ -154,14 +152,13 @@ func createKimiLLM(params map[string]interface{}) (*kimi.LLM, error) {
 
 // createQwenLLM 创建Qwen LLM实例
 func createQwenLLM(params map[string]interface{}) (*qwen.LLM, error) {
-	// 必填校验
-	apiKey, _ := params["api_key"].(string)
-	if apiKey == "" {
-		return nil, ErrMissingRequiredParam
-	}
-
 	// 构建选项
-	opts := []qwen.Option{qwen.WithAPIKey(apiKey)}
+	opts := []qwen.Option{}
+
+	// 添加参数
+	if apiKey, ok := params["api_key"].(string); ok && apiKey != "" {
+		opts = append(opts, qwen.WithAPIKey(apiKey))
+	}
 
 	if model, ok := params["model"].(string); ok && model != "" {
 		opts = append(opts, qwen.WithModel(model))
