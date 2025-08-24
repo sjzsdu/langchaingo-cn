@@ -1,0 +1,83 @@
+{
+  "llms": {
+    "chat_llm": {
+      "type": "openai",
+      "model": "gpt-4",
+      "api_key": "${OPENAI_API_KEY}",
+      "temperature": 0.7,
+      "max_tokens": 2048
+    },
+    "summary_llm": {
+      "type": "kimi", 
+      "model": "moonshot-v1-8k",
+      "api_key": "${KIMI_API_KEY}",
+      "temperature": 0.3
+    }
+  },
+  "memories": {
+    "chat_memory": {
+      "type": "conversation_summary",
+      "llm_ref": "summary_llm",
+      "max_token_limit": 1000,
+      "return_messages": true
+    },
+    "simple_memory": {
+      "type": "simple"
+    }
+  },
+  "prompts": {
+    "system_prompt": {
+      "type": "prompt_template",
+      "template": "你是一个专业的{{.role}}，请根据以下信息回答用户问题：\\n{{.context}}",
+      "input_variables": ["role", "context"]
+    },
+    "chat_prompt": {
+      "type": "chat_prompt_template", 
+      "messages": [
+        {
+          "role": "system",
+          "template": "你是一个有用的AI助手。"
+        },
+        {
+          "role": "human",
+          "template": "{{.question}}"
+        }
+      ],
+      "input_variables": ["question"]
+    }
+  },
+  "embeddings": {
+    "doc_embedder": {
+      "type": "openai",
+      "model": "text-embedding-ada-002",
+      "api_key": "${OPENAI_API_KEY}",
+      "batch_size": 100
+    }
+  },
+  "chains": {
+    "basic_llm_chain": {
+      "type": "llm",
+      "llm_ref": "chat_llm",
+      "prompt_ref": "system_prompt"
+    },
+    "conversation_chain": {
+      "type": "conversation",
+      "llm_ref": "chat_llm", 
+      "memory_ref": "chat_memory"
+    },
+    "document_qa_chain": {
+      "type": "stuff_documents",
+      "llm_ref": "chat_llm",
+      "prompt_ref": "system_prompt",
+      "separator": "\\n\\n"
+    }
+  },
+  "agents": {
+    "research_agent": {
+      "type": "zero_shot_react",
+      "llm_ref": "chat_llm",
+      "tools": ["calculator", "terminal"],
+      "max_steps": 5
+    }
+  }
+}
