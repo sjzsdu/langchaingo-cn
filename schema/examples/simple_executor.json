@@ -1,0 +1,20 @@
+{
+  "agent": {
+    "type": "conversational_react",
+    "llm": {
+      "type": "deepseek",
+      "model": "deepseek-chat",
+      "api_key": "${DEEPSEEK_API_KEY}",
+      "temperature": 0.7
+    },
+    "memory": {
+      "type": "conversation_buffer",
+      "max_messages": 5,
+      "return_messages": true
+    },
+    "tools": ["calculator"],
+    "max_steps": 3
+  },
+  "max_iterations": 5,
+  "return_intermediate_steps": false
+}

@@ -1,0 +1,55 @@
+{
+  "agent": {
+    "type": "zero_shot_react",
+    "llm": {
+      "type": "deepseek",
+      "model": "deepseek-chat",
+      "api_key": "${DEEPSEEK_API_KEY}",
+      "temperature": 0.7,
+      "max_tokens": 2000,
+      "options": {
+        "stream": false,
+        "stop": ["```", "---"]
+      }
+    },
+    "memory": {
+      "type": "conversation_buffer",
+      "max_messages": 10,
+      "return_messages": true
+    },
+    "tools": ["calculator", "web_search", "file_reader"],
+    "max_steps": 5,
+    "options": {
+      "verbose": true,
+      "return_thought_process": true
+    }
+  },
+  "memory": {
+    "type": "conversation_summary",
+    "max_token_limit": 4000,
+    "llm": {
+      "type": "qwen",
+      "model": "qwen-turbo",
+      "api_key": "${QWEN_API_KEY}",
+      "temperature": 0.3,
+      "options": {
+        "summarize_prompt": "请简洁地总结以下对话内容，保留关键信息："
+      }
+    }
+  },
+  "max_iterations": 10,
+  "return_intermediate_steps": true,
+  "error_handler": {
+    "type": "retry",
+    "options": {
+      "max_retries": 3,
+      "backoff_strategy": "exponential",
+      "retry_on": ["timeout", "rate_limit", "server_error"]
+    }
+  },
+  "options": {
+    "timeout": 30,
+    "debug": false,
+    "log_level": "info"
+  }
+}

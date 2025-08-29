@@ -15,6 +15,7 @@ type Config struct {
 	Embeddings map[string]*EmbeddingConfig `json:"embeddings,omitempty"`
 	Chains     map[string]*ChainConfig     `json:"chains,omitempty"`
 	Agents     map[string]*AgentConfig     `json:"agents,omitempty"`
+	Executors  map[string]*ExecutorConfig  `json:"executors,omitempty"`
 }
 
 // LLMConfig LLM组件配置
@@ -30,24 +31,24 @@ type LLMConfig struct {
 
 // MemoryConfig Memory组件配置
 type MemoryConfig struct {
-	Type           string                 `json:"type"`             // conversation_buffer, conversation_summary, conversation_token_buffer
-	MaxTokenLimit  *int                   `json:"max_token_limit"`  // token限制
-	MaxMessages    *int                   `json:"max_messages"`     // 消息数量限制
-	ReturnMessages *bool                  `json:"return_messages"`  // 是否返回消息
-	LLMRef         string                 `json:"llm_ref"`          // 引用的LLM组件
-	Options        map[string]interface{} `json:"options"`          // 其他选项
+	Type           string                 `json:"type"`            // conversation_buffer, conversation_summary, conversation_token_buffer
+	MaxTokenLimit  *int                   `json:"max_token_limit"` // token限制
+	MaxMessages    *int                   `json:"max_messages"`    // 消息数量限制
+	ReturnMessages *bool                  `json:"return_messages"` // 是否返回消息
+	LLMRef         string                 `json:"llm_ref"`         // 引用的LLM组件
+	Options        map[string]interface{} `json:"options"`         // 其他选项
 }
 
 // PromptConfig Prompt组件配置
 type PromptConfig struct {
-	Type              string                 `json:"type"`                // prompt_template, chat_prompt_template
-	Template          string                 `json:"template"`            // 模板内容
-	InputVariables    []string               `json:"input_variables"`     // 输入变量
-	PartialVariables  map[string]string      `json:"partial_variables"`   // 部分变量
-	TemplateFormat    string                 `json:"template_format"`     // 模板格式
-	ValidateTemplate  *bool                  `json:"validate_template"`   // 是否验证模板
-	Messages          []ChatMessageConfig    `json:"messages"`            // 聊天消息（用于chat_prompt_template）
-	Options           map[string]interface{} `json:"options"`             // 其他选项
+	Type             string                 `json:"type"`              // prompt_template, chat_prompt_template
+	Template         string                 `json:"template"`          // 模板内容
+	InputVariables   []string               `json:"input_variables"`   // 输入变量
+	PartialVariables map[string]string      `json:"partial_variables"` // 部分变量
+	TemplateFormat   string                 `json:"template_format"`   // 模板格式
+	ValidateTemplate *bool                  `json:"validate_template"` // 是否验证模板
+	Messages         []ChatMessageConfig    `json:"messages"`          // 聊天消息（用于chat_prompt_template）
+	Options          map[string]interface{} `json:"options"`           // 其他选项
 }
 
 // ChatMessageConfig 聊天消息配置
@@ -58,26 +59,26 @@ type ChatMessageConfig struct {
 
 // EmbeddingConfig Embedding组件配置
 type EmbeddingConfig struct {
-	Type       string                 `json:"type"`        // openai, voyage, cohere
-	Model      string                 `json:"model"`       // 模型名称
-	APIKey     string                 `json:"api_key"`     // API密钥
-	BaseURL    string                 `json:"base_url"`    // 基础URL
-	BatchSize  *int                   `json:"batch_size"`  // 批处理大小
-	Options    map[string]interface{} `json:"options"`     // 其他选项
+	Type      string                 `json:"type"`       // openai, voyage, cohere
+	Model     string                 `json:"model"`      // 模型名称
+	APIKey    string                 `json:"api_key"`    // API密钥
+	BaseURL   string                 `json:"base_url"`   // 基础URL
+	BatchSize *int                   `json:"batch_size"` // 批处理大小
+	Options   map[string]interface{} `json:"options"`    // 其他选项
 }
 
 // ChainConfig Chain组件配置
 type ChainConfig struct {
-	Type            string                 `json:"type"`             // llm, conversation, sequential, stuff_documents, map_reduce
-	LLMRef          string                 `json:"llm_ref"`          // 引用的LLM组件
-	MemoryRef       string                 `json:"memory_ref"`       // 引用的Memory组件
-	PromptRef       string                 `json:"prompt_ref"`       // 引用的Prompt组件
-	Chains          []string               `json:"chains"`           // 子链（用于sequential）
-	InputKeys       []string               `json:"input_keys"`       // 输入键
-	OutputKeys      []string               `json:"output_keys"`      // 输出键
-	Separator       string                 `json:"separator"`        // 分隔符（用于stuff_documents）
-	MaxConcurrency  *int                   `json:"max_concurrency"`  // 最大并发数
-	Options         map[string]interface{} `json:"options"`          // 其他选项
+	Type           string                 `json:"type"`            // llm, conversation, sequential, stuff_documents, map_reduce
+	LLMRef         string                 `json:"llm_ref"`         // 引用的LLM组件
+	MemoryRef      string                 `json:"memory_ref"`      // 引用的Memory组件
+	PromptRef      string                 `json:"prompt_ref"`      // 引用的Prompt组件
+	Chains         []string               `json:"chains"`          // 子链（用于sequential）
+	InputKeys      []string               `json:"input_keys"`      // 输入键
+	OutputKeys     []string               `json:"output_keys"`     // 输出键
+	Separator      string                 `json:"separator"`       // 分隔符（用于stuff_documents）
+	MaxConcurrency *int                   `json:"max_concurrency"` // 最大并发数
+	Options        map[string]interface{} `json:"options"`         // 其他选项
 }
 
 // AgentConfig Agent组件配置
@@ -85,9 +86,24 @@ type AgentConfig struct {
 	Type      string                 `json:"type"`       // zero_shot_react, conversational_react
 	LLMRef    string                 `json:"llm_ref"`    // 引用的LLM组件
 	MemoryRef string                 `json:"memory_ref"` // 引用的Memory组件
-	Tools     []string               `json:"tools"`      // 工具列表
 	MaxSteps  *int                   `json:"max_steps"`  // 最大步数
 	Options   map[string]interface{} `json:"options"`    // 其他选项
+}
+
+// ExecutorConfig Executor组件配置
+type ExecutorConfig struct {
+	AgentRef                string                 `json:"agent_ref"`                 // 引用的Agent组件
+	MemoryRef               string                 `json:"memory_ref"`                // 引用的Memory组件
+	MaxIterations           *int                   `json:"max_iterations"`            // 最大迭代次数
+	ReturnIntermediateSteps *bool                  `json:"return_intermediate_steps"` // 是否返回中间步骤
+	ErrorHandlerConfig      *ErrorHandlerConfig    `json:"error_handler"`             // 错误处理器配置
+	Options                 map[string]interface{} `json:"options"`                   // 其他选项
+}
+
+// ErrorHandlerConfig 错误处理器配置
+type ErrorHandlerConfig struct {
+	Type    string                 `json:"type"`    // 错误处理器类型
+	Options map[string]interface{} `json:"options"` // 其他选项
 }
 
 // LoadConfigFromFile 从文件加载配置
@@ -169,6 +185,13 @@ func (c *Config) Validate() error {
 	for name, agentConfig := range c.Agents {
 		if err := agentConfig.ValidateReferences(c); err != nil {
 			return fmt.Errorf("invalid Agent config '%s': %w", name, err)
+		}
+	}
+
+	// 验证Executor配置
+	for name, executorConfig := range c.Executors {
+		if err := executorConfig.ValidateReferences(c); err != nil {
+			return fmt.Errorf("invalid Executor config '%s': %w", name, err)
 		}
 	}
 
@@ -306,6 +329,48 @@ func (a *AgentConfig) ValidateReferences(config *Config) error {
 			return fmt.Errorf("referenced Memory '%s' not found", a.MemoryRef)
 		}
 	}
+
+	return nil
+}
+
+// ValidateReferences 验证Executor配置的引用
+func (e *ExecutorConfig) ValidateReferences(config *Config) error {
+	// 验证Agent引用
+	if e.AgentRef == "" {
+		return fmt.Errorf("agent_ref is required")
+	}
+	if _, exists := config.Agents[e.AgentRef]; !exists {
+		return fmt.Errorf("referenced Agent '%s' not found", e.AgentRef)
+	}
+
+	// 验证Memory引用（可选）
+	if e.MemoryRef != "" {
+		if _, exists := config.Memories[e.MemoryRef]; !exists {
+			return fmt.Errorf("referenced Memory '%s' not found", e.MemoryRef)
+		}
+	}
+
+	// 验证ErrorHandler配置（可选）
+	if e.ErrorHandlerConfig != nil {
+		if err := e.ErrorHandlerConfig.Validate(); err != nil {
+			return fmt.Errorf("invalid error handler config: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// Validate 验证ErrorHandler配置
+func (eh *ErrorHandlerConfig) Validate() error {
+	if eh.Type == "" {
+		return fmt.Errorf("type is required")
+	}
+
+	// 这里可以根据实际支持的错误处理器类型添加验证
+	// supportedTypes := []string{"default", "retry", "ignore"}
+	// if !contains(supportedTypes, eh.Type) {
+	//     return fmt.Errorf("unsupported type: %s, supported: %s", eh.Type, strings.Join(supportedTypes, ", "))
+	// }
 
 	return nil
 }

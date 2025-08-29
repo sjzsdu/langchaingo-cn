@@ -25,9 +25,9 @@ func NewAgentFactory(llmFactory *LLMFactory, memoryFactory *MemoryFactory) *Agen
 
 // Create 根据配置创建Agent实例
 func (f *AgentFactory) Create(config *AgentConfig, allConfigs *Config) (*agents.Executor, error) {
-	if config == nil {
-		return nil, fmt.Errorf("Agent config is nil")
-	}
+       if config == nil {
+	       return nil, fmt.Errorf("agent config is nil")
+       }
 
 	// 验证配置
 	if err := config.ValidateReferences(allConfigs); err != nil {
@@ -57,18 +57,13 @@ func (f *AgentFactory) createZeroShotReactAgent(config *AgentConfig, allConfigs 
 		return nil, fmt.Errorf("failed to create LLM for agent: %w", err)
 	}
 
-	// 获取工具
-	agentTools, err := f.createTools(config.Tools)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create tools for agent: %w", err)
-	}
 
-	// 创建零样本智能体
-	agent := agents.NewOneShotAgent(
-		llm,
-		agentTools,
-		agents.WithMaxIterations(f.getMaxSteps(config)),
-	)
+       // 创建零样本智能体
+       agent := agents.NewOneShotAgent(
+	       llm,
+	       nil,
+	       agents.WithMaxIterations(f.getMaxSteps(config)),
+       )
 
 	// 创建执行器
 	executor := agents.NewExecutor(agent)
@@ -106,19 +101,14 @@ func (f *AgentFactory) createConversationalReactAgent(config *AgentConfig, allCo
 		}
 	}
 
-	// 获取工具
-	agentTools, err := f.createTools(config.Tools)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create tools for agent: %w", err)
-	}
 
-	// 创建对话智能体
-	agent := agents.NewConversationalAgent(
-		llm,
-		agentTools,
-		agents.WithMemory(memory),
-		agents.WithMaxIterations(f.getMaxSteps(config)),
-	)
+       // 创建对话智能体
+       agent := agents.NewConversationalAgent(
+	       llm,
+	       nil,
+	       agents.WithMemory(memory),
+	       agents.WithMaxIterations(f.getMaxSteps(config)),
+       )
 
 	// 创建执行器
 	executor := agents.NewExecutor(agent)
@@ -127,38 +117,6 @@ func (f *AgentFactory) createConversationalReactAgent(config *AgentConfig, allCo
 }
 
 // createTools 创建工具列表
-func (f *AgentFactory) createTools(toolNames []string) ([]tools.Tool, error) {
-	var agentTools []tools.Tool
-
-	for _, toolName := range toolNames {
-		tool, err := f.createTool(toolName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create tool '%s': %w", toolName, err)
-		}
-		agentTools = append(agentTools, tool)
-	}
-
-	return agentTools, nil
-}
-
-// createTool 创建单个工具
-func (f *AgentFactory) createTool(toolName string) (tools.Tool, error) {
-	switch toolName {
-	case "calculator":
-		return tools.Calculator{}, nil
-	case "search":
-		// 需要实际的搜索工具实现
-		return nil, fmt.Errorf("search tool not implemented yet")
-	case "terminal":
-		// 需要Terminal工具实现
-		return nil, fmt.Errorf("terminal tool not implemented yet")
-	case "python":
-		// 需要Python执行工具实现
-		return nil, fmt.Errorf("python tool not implemented yet")
-	default:
-		return nil, fmt.Errorf("unknown tool: %s", toolName)
-	}
-}
 
 // getMaxSteps 获取最大步数
 func (f *AgentFactory) getMaxSteps(config *AgentConfig) int {
