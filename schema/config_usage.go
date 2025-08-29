@@ -22,7 +22,6 @@ type AgentUsageConfig struct {
 	Type     string                 `json:"type"`                // zero_shot_react, conversational_react
 	LLM      *LLMConfig             `json:"llm"`                 // 直接嵌入LLM配置
 	Memory   *MemoryUsageConfig     `json:"memory,omitempty"`    // 直接嵌入Memory配置
-	Tools    []string               `json:"tools"`               // 工具列表
 	MaxSteps *int                   `json:"max_steps,omitempty"` // 最大步数
 	Options  map[string]interface{} `json:"options,omitempty"`   // 其他选项
 }
