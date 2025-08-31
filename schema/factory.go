@@ -254,3 +254,18 @@ func CreateChainFromConfig(config *ChainConfig, allConfigs *Config) (chains.Chai
 func CreateAgentFromConfig(config *AgentConfig, allConfigs *Config) (*agents.Executor, error) {
 	return globalFactory.CreateAgent(config, allConfigs)
 }
+
+// CreateExecutorFromUsageConfig 使用全局工厂从UsageConfig创建Executor
+func CreateExecutorFromUsageConfig(config *ExecutorUsageConfig) (*agents.Executor, error) {
+	return config.CreateExecutor()
+}
+
+// CreateExecutorFromUsageFile 使用全局工厂从文件创建Executor
+func CreateExecutorFromUsageFile(filename string) (*agents.Executor, error) {
+	return CreateExecutorFromFile(filename)
+}
+
+// CreateExecutorFromUsageJSON 使用全局工厂从JSON创建Executor
+func CreateExecutorFromUsageJSON(jsonStr string) (*agents.Executor, error) {
+	return CreateExecutorFromJSON(jsonStr)
+}

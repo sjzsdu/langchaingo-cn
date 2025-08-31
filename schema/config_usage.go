@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+
+	"github.com/tmc/langchaingo/agents"
 )
 
 // ExecutorUsageConfig 以Executor为入口的使用风格配置
@@ -339,38 +341,44 @@ func (e *ExecutorUsageConfig) ToConfig() (*Config, error) {
 	}
 
 	if e.Agent != nil {
-		// 处理Agent的Chain配置
-		var chainName string
-		if e.Agent.Chain != nil {
-			chainName = "agent_chain"
-			// 将ChainUsageConfig转换为ChainConfig
-			chainConfig, err := e.Agent.Chain.toChainConfig(config)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert agent chain config: %w", err)
-			}
-			config.Chains[chainName] = chainConfig
-		}
-
 		// 创建Agent配置
 		agentName := "main_agent"
-		agentOptions := make(map[string]interface{})
-		if e.Agent.Options != nil {
-			for k, v := range e.Agent.Options {
-				agentOptions[k] = v
-			}
-		}
-		// 通过Options传递Chain和OutputKey信息
-		if chainName != "" {
-			agentOptions["chain_ref"] = chainName
-		}
-		if e.Agent.OutputKey != "" {
-			agentOptions["output_key"] = e.Agent.OutputKey
-		}
-
 		agentConfig := &AgentConfig{
 			Type:    e.Agent.Type,
-			Options: agentOptions,
+			Options: make(map[string]interface{}),
 		}
+
+		// 复制原有的Options
+		if e.Agent.Options != nil {
+			for k, v := range e.Agent.Options {
+				agentConfig.Options[k] = v
+			}
+		}
+
+		// 设置OutputKey
+		if e.Agent.OutputKey != "" {
+			agentConfig.Options["output_key"] = e.Agent.OutputKey
+		}
+
+		// 处理Agent的Chain配置
+		if e.Agent.Chain != nil {
+			// 对于简单的llm chain，直接提取LLM作为Agent的LLM引用
+			if e.Agent.Chain.Type == "llm" && e.Agent.Chain.LLM != nil {
+				llmName := "agent_llm"
+				config.LLMs[llmName] = e.Agent.Chain.LLM
+				agentConfig.LLMRef = llmName
+			} else {
+				// 对于复杂的chain，创建完整的chain配置
+				chainName := "agent_chain"
+				chainConfig, err := e.Agent.Chain.toChainConfig(config)
+				if err != nil {
+					return nil, fmt.Errorf("failed to convert agent chain config: %w", err)
+				}
+				config.Chains[chainName] = chainConfig
+				agentConfig.Options["chain_ref"] = chainName
+			}
+		}
+
 		config.Agents[agentName] = agentConfig
 
 		// 处理Executor级别的Memory
@@ -410,6 +418,62 @@ func (e *ExecutorUsageConfig) ToConfig() (*Config, error) {
 	}
 
 	return config, nil
+}
+
+// CreateExecutor 从ExecutorUsageConfig直接创建Executor实例
+func (e *ExecutorUsageConfig) CreateExecutor() (*agents.Executor, error) {
+	// Validate config first
+	if err := e.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid executor config: %w", err)
+	}
+
+	// Create factory
+	factory := NewFactory()
+
+	// Convert to standard config format
+	config, err := e.ToConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert config: %w", err)
+	}
+
+	// Get the main agent config referenced by executor
+	executorConfig, exists := config.Executors["main_executor"]
+	if !exists {
+		return nil, fmt.Errorf("main_executor not found in config")
+	}
+
+	agentConfig, exists := config.Agents[executorConfig.AgentRef]
+	if !exists {
+		return nil, fmt.Errorf("agent '%s' not found in config", executorConfig.AgentRef)
+	}
+
+	// Create executor using factory
+	executor, err := factory.CreateAgent(agentConfig, config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create executor: %w", err)
+	}
+
+	return executor, nil
+}
+
+// CreateExecutorFromFile 从文件创建Executor实例
+func CreateExecutorFromFile(filename string) (*agents.Executor, error) {
+	config, err := LoadExecutorUsageConfigFromFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	return config.CreateExecutor()
+}
+
+// CreateExecutorFromJSON 从JSON字符串创建Executor实例
+func CreateExecutorFromJSON(jsonStr string) (*agents.Executor, error) {
+	config, err := LoadExecutorUsageConfigFromJSON(jsonStr)
+	if err != nil {
+		return nil, err
+	}
+
+	return config.CreateExecutor()
 }
 
 // joinStrings 连接字符串切片
