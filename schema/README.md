@@ -47,6 +47,79 @@ Schema 包为 LangChainGo-CN 提供了一个强大的配置驱动组件工厂系
 - `zero_shot_react`: 零样本 ReAct 智能体
 - `conversational_react`: 对话式 ReAct 智能体
 
+## 配置生成器 🚀
+
+为了简化配置文件的创建，Schema 包提供了强大的配置生成器，可以快速生成各种组件的极简配置文件。
+
+### 快速生成配置文件
+
+```go
+package main
+
+import (
+    "github.com/sjzsdu/langchaingo-cn/schema"
+)
+
+func main() {
+    // 1. 快速生成LLM配置
+    schema.QuickGenerateLLM("deepseek", "deepseek-chat", "my_llm.json")
+    
+    // 2. 快速生成Chain配置
+    schema.QuickGenerateChain("conversation", "kimi", "moonshot-v1-8k", "my_chain.json")
+    
+    // 3. 快速生成Agent配置
+    schema.QuickGenerateAgent("zero_shot_react", "openai", "gpt-4", "my_agent.json")
+    
+    // 4. 快速生成Executor配置
+    schema.QuickGenerateExecutor("conversational_react", "qwen", "qwen-plus", "my_executor.json")
+}
+```
+
+### 使用配置生成器
+
+```go
+// 创建配置生成器
+generator := schema.NewConfigGenerator("./configs")
+
+// 生成DeepSeek聊天配置
+generator.GenerateDeepSeekChatConfig("deepseek_chat.json")
+
+// 生成Kimi聊天配置
+generator.GenerateKimiChatConfig("kimi_chat.json")
+
+// 生成自定义Chain配置
+generator.GenerateChainConfig(schema.ChainTemplate{
+    Type: "conversation",
+    LLMTemplate: schema.LLMTemplate{
+        Type:        "deepseek",
+        Model:       "deepseek-chat",
+        Temperature: 0.7,
+        MaxTokens:   2048,
+    },
+    MemoryType:     "conversation_buffer",
+    PromptTemplate: "你是专业的AI助手，请回答：{{.input}}",
+}, "custom_chain.json")
+```
+
+### 预设配置快捷方法
+
+```go
+// DeepSeek相关
+generator.GenerateDeepSeekChatConfig("deepseek_chat.json")
+generator.GenerateExecutorWithDeepSeek("deepseek_executor.json")
+
+// Kimi相关
+generator.GenerateKimiChatConfig("kimi_chat.json")
+generator.GenerateConversationalAgentConfig("kimi", "moonshot-v1-8k", "kimi_agent.json")
+
+// OpenAI相关
+generator.GenerateOpenAIChatConfig("openai_chat.json")
+generator.GenerateReactAgentConfig("openai", "gpt-4", "openai_agent.json")
+
+// 通义千问相关
+generator.GenerateQwenChatConfig("qwen_chat.json")
+```
+
 ## 快速开始
 
 ### 1. 基本用法
@@ -237,6 +310,28 @@ if err != nil {
 - `CreateMemoryFromConfig(config *MemoryConfig, llmConfigs map[string]*LLMConfig) (schema.Memory, error)`
 - `CreatePromptFromConfig(config *PromptConfig) (prompts.PromptTemplate, error)`
 - `CreateEmbeddingFromConfig(config *EmbeddingConfig) (embeddings.Embedder, error)`
+
+### 配置生成器函数
+
+#### 快速生成方法
+- `QuickGenerateLLM(llmType, model, filename string) error`: 快速生成LLM配置
+- `QuickGenerateChain(chainType, llmType, model, filename string) error`: 快速生成Chain配置
+- `QuickGenerateAgent(agentType, llmType, model, filename string) error`: 快速生成Agent配置
+- `QuickGenerateExecutor(agentType, llmType, model, filename string) error`: 快速生成Executor配置
+
+#### 预设配置方法
+- `GenerateDeepSeekChatConfig(filename string) error`: 生成DeepSeek聊天配置
+- `GenerateKimiChatConfig(filename string) error`: 生成Kimi聊天配置
+- `GenerateOpenAIChatConfig(filename string) error`: 生成OpenAI聊天配置
+- `GenerateQwenChatConfig(filename string) error`: 生成通义千问聊天配置
+- `GenerateReactAgentConfig(llmType, model, filename string) error`: 生成ReAct智能体配置
+- `GenerateExecutorWithDeepSeek(filename string) error`: 生成DeepSeek执行器配置
+
+#### 自定义配置方法
+- `GenerateLLMConfig(template LLMTemplate, filename string) error`: 自定义LLM配置
+- `GenerateChainConfig(template ChainTemplate, filename string) error`: 自定义Chain配置
+- `GenerateAgentConfig(template AgentTemplate, filename string) error`: 自定义Agent配置
+- `GenerateExecutorConfig(template ExecutorTemplate, filename string) error`: 自定义Executor配置
 
 ## 贡献
 

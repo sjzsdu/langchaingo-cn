@@ -1,0 +1,71 @@
+site_name: LangChain Go 中文版
+site_description: LangChain Go 语言实现的中文文档
+site_url: https://sjzsdu.github.io/langchaingo-cn
+
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - search.highlight
+    - search.share
+    - content.code.copy
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: 切换到深色模式
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: 切换到浅色模式
+
+nav:
+  - 首页: index.md
+  - 快速开始: getting-started.md
+  - 配置系统:
+    - 配置使用风格: config_usage.md
+    - Schema 配置: schema/README.md
+  - 核心模块:
+    - LLMs: llms.md
+    - Graph: graph/README.md
+  - 示例:
+    - 基础示例: examples/README.md
+    - 完成示例: examples/completion.md
+    - 嵌入示例: examples/embedding.md
+    - 流式示例: examples/streaming.md
+    - 工具调用: examples/toolcall.md
+    - 多模态: examples/multi-modal.md
+  - API 参考: api/
+
+plugins:
+  - search:
+      lang: zh
+  - awesome-pages
+
+markdown_extensions:
+  - codehilite:
+      guess_lang: false
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+
+repo_name: sjzsdu/langchaingo-cn
+repo_url: https://github.com/sjzsdu/langchaingo-cn

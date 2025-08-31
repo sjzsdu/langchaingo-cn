@@ -25,9 +25,9 @@ func NewAgentFactory(llmFactory *LLMFactory, memoryFactory *MemoryFactory) *Agen
 
 // Create 根据配置创建Agent实例
 func (f *AgentFactory) Create(config *AgentConfig, allConfigs *Config) (*agents.Executor, error) {
-       if config == nil {
-	       return nil, fmt.Errorf("agent config is nil")
-       }
+	if config == nil {
+		return nil, fmt.Errorf("agent config is nil")
+	}
 
 	// 验证配置
 	if err := config.ValidateReferences(allConfigs); err != nil {
@@ -57,13 +57,12 @@ func (f *AgentFactory) createZeroShotReactAgent(config *AgentConfig, allConfigs 
 		return nil, fmt.Errorf("failed to create LLM for agent: %w", err)
 	}
 
-
-       // 创建零样本智能体
-       agent := agents.NewOneShotAgent(
-	       llm,
-	       nil,
-	       agents.WithMaxIterations(f.getMaxSteps(config)),
-       )
+	// 创建零样本智能体
+	agent := agents.NewOneShotAgent(
+		llm,
+		nil,
+		agents.WithMaxIterations(f.getMaxSteps(config)),
+	)
 
 	// 创建执行器
 	executor := agents.NewExecutor(agent)
@@ -101,14 +100,13 @@ func (f *AgentFactory) createConversationalReactAgent(config *AgentConfig, allCo
 		}
 	}
 
-
-       // 创建对话智能体
-       agent := agents.NewConversationalAgent(
-	       llm,
-	       nil,
-	       agents.WithMemory(memory),
-	       agents.WithMaxIterations(f.getMaxSteps(config)),
-       )
+	// 创建对话智能体
+	agent := agents.NewConversationalAgent(
+		llm,
+		nil,
+		agents.WithMemory(memory),
+		agents.WithMaxIterations(f.getMaxSteps(config)),
+	)
 
 	// 创建执行器
 	executor := agents.NewExecutor(agent)

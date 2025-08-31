@@ -1,0 +1,37 @@
+{
+  "llms": {
+    "chain_llm": {
+      "type": "openai",
+      "model": "gpt-4",
+      "api_key": "${OPENAI_API_KEY}",
+      "base_url": "",
+      "temperature": 0.7,
+      "max_tokens": 2048,
+      "options": null
+    }
+  },
+  "memories": {
+    "chain_memory": {
+      "type": "conversation_buffer",
+      "max_token_limit": null,
+      "max_messages": null,
+      "return_messages": null,
+      "llm_ref": "",
+      "options": null
+    }
+  },
+  "chains": {
+    "main_chain": {
+      "type": "conversation",
+      "llm_ref": "chain_llm",
+      "memory_ref": "chain_memory",
+      "prompt_ref": "",
+      "chains": null,
+      "input_keys": null,
+      "output_keys": null,
+      "separator": "",
+      "max_concurrency": null,
+      "options": null
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "llms": {
+    "agent_llm": {
+      "type": "kimi",
+      "model": "moonshot-v1-8k",
+      "api_key": "${KIMI_API_KEY}",
+      "base_url": "",
+      "temperature": 0.3,
+      "max_tokens": 2048,
+      "options": null
+    }
+  },
+  "memories": {
+    "agent_memory": {
+      "type": "conversation_buffer",
+      "max_token_limit": null,
+      "max_messages": null,
+      "return_messages": null,
+      "llm_ref": "",
+      "options": null
+    }
+  },
+  "agents": {
+    "main_agent": {
+      "type": "conversational_react",
+      "llm_ref": "agent_llm",
+      "memory_ref": "agent_memory",
+      "max_steps": 5,
+      "options": null
+    }
+  }
+}
