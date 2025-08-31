@@ -9,7 +9,7 @@ import (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "langchaingo-cn",
+	Use:   "xin",
 	Short: "🚀 LangChainGo-CN - 中文化的 LangChain Go 版本",
 	Long: `🚀 LangChainGo-CN - 中文化的 LangChain Go 版本
 
