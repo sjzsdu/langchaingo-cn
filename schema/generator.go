@@ -262,15 +262,20 @@ func (g *ConfigGenerator) GenerateExecutorConfig(template ExecutorTemplate, file
 	config := &ExecutorUsageConfig{
 		Agent: &AgentUsageConfig{
 			Type: template.AgentTemplate.Type,
-			LLM: &LLMConfig{
-				Type:   template.AgentTemplate.LLMTemplate.Type,
-				Model:  template.AgentTemplate.LLMTemplate.Model,
-				APIKey: template.AgentTemplate.LLMTemplate.APIKey,
+			Chain: &ChainUsageConfig{
+				Type: "llm", // Agent内部使用LLM Chain
+				LLM: &LLMConfig{
+					Type:   template.AgentTemplate.LLMTemplate.Type,
+					Model:  template.AgentTemplate.LLMTemplate.Model,
+					APIKey: template.AgentTemplate.LLMTemplate.APIKey,
+				},
+				Memory: &MemoryUsageConfig{
+					Type: template.AgentTemplate.MemoryType,
+				},
 			},
-			Memory: &MemoryUsageConfig{
-				Type: template.AgentTemplate.MemoryType,
+			Options: map[string]interface{}{
+				"max_steps": template.AgentTemplate.MaxSteps,
 			},
-			MaxSteps: &template.AgentTemplate.MaxSteps,
 		},
 		MaxIterations:           &template.MaxIterations,
 		ReturnIntermediateSteps: &template.ReturnIntermediateSteps,
@@ -278,13 +283,13 @@ func (g *ConfigGenerator) GenerateExecutorConfig(template ExecutorTemplate, file
 
 	// 设置LLM可选参数
 	if template.AgentTemplate.LLMTemplate.BaseURL != "" {
-		config.Agent.LLM.BaseURL = template.AgentTemplate.LLMTemplate.BaseURL
+		config.Agent.Chain.LLM.BaseURL = template.AgentTemplate.LLMTemplate.BaseURL
 	}
 	if template.AgentTemplate.LLMTemplate.Temperature > 0 {
-		config.Agent.LLM.Temperature = &template.AgentTemplate.LLMTemplate.Temperature
+		config.Agent.Chain.LLM.Temperature = &template.AgentTemplate.LLMTemplate.Temperature
 	}
 	if template.AgentTemplate.LLMTemplate.MaxTokens > 0 {
-		config.Agent.LLM.MaxTokens = &template.AgentTemplate.LLMTemplate.MaxTokens
+		config.Agent.Chain.LLM.MaxTokens = &template.AgentTemplate.LLMTemplate.MaxTokens
 	}
 
 	return g.writeExecutorConfigToFile(config, filename)

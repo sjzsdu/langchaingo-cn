@@ -176,10 +176,15 @@ func TestConfigGenerator(t *testing.T) {
 		assert.True(t, *config.ReturnIntermediateSteps)
 
 		// 验证Agent配置
-		assert.NotNil(t, config.Agent.LLM)
-		assert.Equal(t, "qwen", config.Agent.LLM.Type)
-		assert.Equal(t, "qwen-plus", config.Agent.LLM.Model)
-		assert.Equal(t, 5, *config.Agent.MaxSteps)
+		assert.NotNil(t, config.Agent.Chain)
+		assert.NotNil(t, config.Agent.Chain.LLM)
+		assert.Equal(t, "qwen", config.Agent.Chain.LLM.Type)
+		assert.Equal(t, "qwen-plus", config.Agent.Chain.LLM.Model)
+
+		// MaxSteps现在在Options中
+		maxSteps, exists := config.Agent.Options["max_steps"]
+		assert.True(t, exists)
+		assert.Equal(t, 5, int(maxSteps.(float64))) // JSON解析后数字变为float64
 	})
 }
 

@@ -11,7 +11,7 @@ import (
 	"github.com/tmc/langchaingo/prompts"
 )
 
-func main() {
+func usageExample() {
 	// 示例1：从JSON配置文件创建应用
 	fmt.Println("=== 示例1：从JSON配置文件创建应用 ===")
 	app, err := schema.CreateApplicationFromFile("schema/examples/simple_chat.json")

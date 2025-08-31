@@ -17,13 +17,12 @@ type ExecutorUsageConfig struct {
 	Options                 map[string]interface{} `json:"options,omitempty"`                   // 其他选项
 }
 
-// AgentUsageConfig Agent使用配置 - 直接嵌入依赖
+// AgentUsageConfig Agent使用配置 - 简化版，对应实际Agent结构
 type AgentUsageConfig struct {
-	Type     string                 `json:"type"`                // zero_shot_react, conversational_react
-	LLM      *LLMConfig             `json:"llm"`                 // 直接嵌入LLM配置
-	Memory   *MemoryUsageConfig     `json:"memory,omitempty"`    // 直接嵌入Memory配置
-	MaxSteps *int                   `json:"max_steps,omitempty"` // 最大步数
-	Options  map[string]interface{} `json:"options,omitempty"`   // 其他选项
+	Type      string                 `json:"type"`                 // zero_shot_react, conversational_react
+	Chain     *ChainUsageConfig      `json:"chain"`                // 核心处理链配置
+	OutputKey string                 `json:"output_key,omitempty"` // 输出键，默认为"output"
+	Options   map[string]interface{} `json:"options,omitempty"`    // 其他选项（如Tools、Callbacks等通过Options传递）
 }
 
 // MemoryUsageConfig Memory使用配置 - 直接嵌入依赖
@@ -158,18 +157,12 @@ func (a *AgentUsageConfig) Validate() error {
 		return fmt.Errorf("unsupported type: %s, supported: %s", a.Type, joinStrings(supportedTypes, ", "))
 	}
 
-	if a.LLM == nil {
-		return fmt.Errorf("llm is required")
+	if a.Chain == nil {
+		return fmt.Errorf("chain is required")
 	}
 
-	if err := a.LLM.Validate(); err != nil {
-		return fmt.Errorf("invalid llm config: %w", err)
-	}
-
-	if a.Memory != nil {
-		if err := a.Memory.Validate(); err != nil {
-			return fmt.Errorf("invalid memory config: %w", err)
-		}
+	if err := a.Chain.Validate(); err != nil {
+		return fmt.Errorf("invalid chain config: %w", err)
 	}
 
 	return nil
@@ -270,59 +263,119 @@ func (e *EmbeddingUsageConfig) Validate() error {
 	return nil
 }
 
+// toChainConfig 将ChainUsageConfig转换为ChainConfig
+func (c *ChainUsageConfig) toChainConfig(config *Config) (*ChainConfig, error) {
+	chainConfig := &ChainConfig{
+		Type:           c.Type,
+		InputKeys:      c.InputKeys,
+		OutputKeys:     c.OutputKeys,
+		Separator:      c.Separator,
+		MaxConcurrency: c.MaxConcurrency,
+		Options:        c.Options,
+	}
+
+	// 处理LLM引用
+	if c.LLM != nil {
+		llmName := fmt.Sprintf("chain_llm_%p", c) // 使用指针地址确保唯一性
+		config.LLMs[llmName] = c.LLM
+		chainConfig.LLMRef = llmName
+	}
+
+	// 处理Memory引用
+	if c.Memory != nil {
+		memoryName := fmt.Sprintf("chain_memory_%p", c)
+		memoryConfig := &MemoryConfig{
+			Type:           c.Memory.Type,
+			MaxTokenLimit:  c.Memory.MaxTokenLimit,
+			MaxMessages:    c.Memory.MaxMessages,
+			ReturnMessages: c.Memory.ReturnMessages,
+			Options:        c.Memory.Options,
+		}
+
+		if c.Memory.LLM != nil {
+			memoryLLMName := fmt.Sprintf("chain_memory_llm_%p", c)
+			config.LLMs[memoryLLMName] = c.Memory.LLM
+			memoryConfig.LLMRef = memoryLLMName
+		}
+
+		config.Memories[memoryName] = memoryConfig
+		chainConfig.MemoryRef = memoryName
+	}
+
+	// 处理Prompt引用
+	if c.Prompt != nil {
+		promptName := fmt.Sprintf("chain_prompt_%p", c)
+		config.Prompts[promptName] = c.Prompt
+		chainConfig.PromptRef = promptName
+	}
+
+	// 处理子链
+	if len(c.Chains) > 0 {
+		subChainRefs := make([]string, len(c.Chains))
+		for i, subChain := range c.Chains {
+			subChainName := fmt.Sprintf("subchain_%d_%p", i, c)
+			subChainConfig, err := subChain.toChainConfig(config)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert subchain[%d]: %w", i, err)
+			}
+			config.Chains[subChainName] = subChainConfig
+			subChainRefs[i] = subChainName
+		}
+		chainConfig.Chains = subChainRefs
+	}
+
+	return chainConfig, nil
+}
+
 // ToConfig 将ExecutorUsageConfig转换为原始的Config格式
 func (e *ExecutorUsageConfig) ToConfig() (*Config, error) {
 	config := &Config{
 		LLMs:      make(map[string]*LLMConfig),
 		Memories:  make(map[string]*MemoryConfig),
 		Prompts:   make(map[string]*PromptConfig),
+		Chains:    make(map[string]*ChainConfig),
 		Agents:    make(map[string]*AgentConfig),
 		Executors: make(map[string]*ExecutorConfig),
 	}
 
-	// 提取并注册Agent的LLM
-	if e.Agent != nil && e.Agent.LLM != nil {
-		llmName := "agent_llm"
-		config.LLMs[llmName] = e.Agent.LLM
-
-		// 提取并注册Agent的Memory
-		var memoryName string
-		if e.Agent.Memory != nil {
-			memoryName = "agent_memory"
-			memoryConfig := &MemoryConfig{
-				Type:           e.Agent.Memory.Type,
-				MaxTokenLimit:  e.Agent.Memory.MaxTokenLimit,
-				MaxMessages:    e.Agent.Memory.MaxMessages,
-				ReturnMessages: e.Agent.Memory.ReturnMessages,
-				Options:        e.Agent.Memory.Options,
+	if e.Agent != nil {
+		// 处理Agent的Chain配置
+		var chainName string
+		if e.Agent.Chain != nil {
+			chainName = "agent_chain"
+			// 将ChainUsageConfig转换为ChainConfig
+			chainConfig, err := e.Agent.Chain.toChainConfig(config)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert agent chain config: %w", err)
 			}
-
-			// 如果Memory需要LLM，设置引用
-			if e.Agent.Memory.LLM != nil {
-				memoryLLMName := "memory_llm"
-				config.LLMs[memoryLLMName] = e.Agent.Memory.LLM
-				memoryConfig.LLMRef = memoryLLMName
-			}
-
-			config.Memories[memoryName] = memoryConfig
+			config.Chains[chainName] = chainConfig
 		}
 
 		// 创建Agent配置
 		agentName := "main_agent"
-		agentConfig := &AgentConfig{
-			Type:     e.Agent.Type,
-			LLMRef:   llmName,
-			MaxSteps: e.Agent.MaxSteps,
-			Options:  e.Agent.Options,
+		agentOptions := make(map[string]interface{})
+		if e.Agent.Options != nil {
+			for k, v := range e.Agent.Options {
+				agentOptions[k] = v
+			}
 		}
-		if memoryName != "" {
-			agentConfig.MemoryRef = memoryName
+		// 通过Options传递Chain和OutputKey信息
+		if chainName != "" {
+			agentOptions["chain_ref"] = chainName
+		}
+		if e.Agent.OutputKey != "" {
+			agentOptions["output_key"] = e.Agent.OutputKey
+		}
+
+		agentConfig := &AgentConfig{
+			Type:    e.Agent.Type,
+			Options: agentOptions,
 		}
 		config.Agents[agentName] = agentConfig
 
-		// 如果Executor有自己的Memory
+		// 处理Executor级别的Memory
 		var executorMemoryName string
-		if e.Memory != nil && e.Memory != e.Agent.Memory {
+		if e.Memory != nil {
 			executorMemoryName = "executor_memory"
 			executorMemoryConfig := &MemoryConfig{
 				Type:           e.Memory.Type,
@@ -351,8 +404,6 @@ func (e *ExecutorUsageConfig) ToConfig() (*Config, error) {
 		}
 		if executorMemoryName != "" {
 			executorConfig.MemoryRef = executorMemoryName
-		} else if memoryName != "" {
-			executorConfig.MemoryRef = memoryName
 		}
 
 		config.Executors["main_executor"] = executorConfig

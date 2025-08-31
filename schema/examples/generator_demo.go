@@ -9,6 +9,18 @@ import (
 )
 
 func main() {
+	fmt.Println("🚀 LangChainGo-CN 配置示例演示")
+	fmt.Println("============================")
+
+	// 可以调用不同的示例
+	fmt.Println("\n1. 运行配置生成器演示...")
+	generatorDemo()
+
+	fmt.Println("\n2. 运行使用示例...")
+	usageExample()
+}
+
+func generatorDemo() {
 	fmt.Println("🚀 LangChainGo-CN 配置文件生成器演示")
 	fmt.Println("=======================================")
 
