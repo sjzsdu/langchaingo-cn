@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/tmc/langchaingo/agents"
-	"github.com/tmc/langchaingo/chains"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/schema"
 	"github.com/tmc/langchaingo/tools"
@@ -45,15 +44,22 @@ func (f *AgentFactory) Create(config *AgentConfig, allConfigs *Config) (*agents.
 
 // createZeroShotReactAgent 创建零样本ReAct智能体
 func (f *AgentFactory) createZeroShotReactAgent(config *AgentConfig, allConfigs *Config) (*agents.Executor, error) {
-	// 获取Chain
+	// 获取Chain配置
 	if config.ChainRef == "" {
-		return nil, fmt.Errorf("Chain reference is required for zero_shot_react agent")
+		return nil, fmt.Errorf("chain reference is required for zero_shot_react agent")
 	}
 
 	chainConfig := allConfigs.Chains[config.ChainRef]
-	chain, err := f.chainFactory.Create(chainConfig, allConfigs)
+	
+	// 直接从Chain配置中获取LLM，而不是从Chain对象中提取
+	if chainConfig.LLMRef == "" {
+		return nil, fmt.Errorf("LLM reference is required in chain for zero_shot_react agent")
+	}
+	
+	llmConfig := allConfigs.LLMs[chainConfig.LLMRef]
+	llm, err := f.chainFactory.llmFactory.Create(llmConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Chain for agent: %w", err)
+		return nil, fmt.Errorf("failed to create LLM for agent: %w", err)
 	}
 
 	// 从Chain配置中获取工具(如果有)
@@ -61,7 +67,7 @@ func (f *AgentFactory) createZeroShotReactAgent(config *AgentConfig, allConfigs 
 
 	// 创建零样本智能体
 	agent := agents.NewOneShotAgent(
-		chain.(*chains.LLMChain).LLM, // 从LLMChain中获取LLM
+		llm, // 直接使用LLM
 		tools,
 		agents.WithMaxIterations(f.getMaxIterations(config)),
 		agents.WithOutputKey(f.getOutputKey(config)),
@@ -75,15 +81,22 @@ func (f *AgentFactory) createZeroShotReactAgent(config *AgentConfig, allConfigs 
 
 // createConversationalReactAgent 创建对话ReAct智能体
 func (f *AgentFactory) createConversationalReactAgent(config *AgentConfig, allConfigs *Config) (*agents.Executor, error) {
-	// 获取Chain
+	// 获取Chain配置
 	if config.ChainRef == "" {
-		return nil, fmt.Errorf("Chain reference is required for conversational_react agent")
+		return nil, fmt.Errorf("chain reference is required for conversational_react agent")
 	}
 
 	chainConfig := allConfigs.Chains[config.ChainRef]
-	chain, err := f.chainFactory.Create(chainConfig, allConfigs)
+	
+	// 直接从Chain配置中获取LLM，而不是从Chain对象中提取
+	if chainConfig.LLMRef == "" {
+		return nil, fmt.Errorf("LLM reference is required in chain for conversational_react agent")
+	}
+	
+	llmConfig := allConfigs.LLMs[chainConfig.LLMRef]
+	llm, err := f.chainFactory.llmFactory.Create(llmConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Chain for agent: %w", err)
+		return nil, fmt.Errorf("failed to create LLM for agent: %w", err)
 	}
 
 	// 从Chain配置中获取工具(如果有)
@@ -91,7 +104,7 @@ func (f *AgentFactory) createConversationalReactAgent(config *AgentConfig, allCo
 
 	// 创建对话智能体
 	agent := agents.NewConversationalAgent(
-		chain.(*chains.LLMChain).LLM, // 从LLMChain中获取LLM
+		llm, // 直接使用LLM
 		tools,
 		agents.WithMaxIterations(f.getMaxIterations(config)),
 		agents.WithOutputKey(f.getOutputKey(config)),
