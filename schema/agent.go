@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/tmc/langchaingo/agents"
+	"github.com/tmc/langchaingo/chains"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/schema"
 	"github.com/tmc/langchaingo/tools"
@@ -11,15 +12,13 @@ import (
 
 // AgentFactory Agent组件工厂
 type AgentFactory struct {
-	llmFactory    *LLMFactory
-	memoryFactory *MemoryFactory
+	chainFactory *ChainFactory
 }
 
 // NewAgentFactory 创建Agent工厂实例
-func NewAgentFactory(llmFactory *LLMFactory, memoryFactory *MemoryFactory) *AgentFactory {
+func NewAgentFactory(chainFactory *ChainFactory) *AgentFactory {
 	return &AgentFactory{
-		llmFactory:    llmFactory,
-		memoryFactory: memoryFactory,
+		chainFactory: chainFactory,
 	}
 }
 
@@ -46,22 +45,26 @@ func (f *AgentFactory) Create(config *AgentConfig, allConfigs *Config) (*agents.
 
 // createZeroShotReactAgent 创建零样本ReAct智能体
 func (f *AgentFactory) createZeroShotReactAgent(config *AgentConfig, allConfigs *Config) (*agents.Executor, error) {
-	// 获取LLM
-	if config.LLMRef == "" {
-		return nil, fmt.Errorf("LLM reference is required for zero_shot_react agent")
+	// 获取Chain
+	if config.ChainRef == "" {
+		return nil, fmt.Errorf("Chain reference is required for zero_shot_react agent")
 	}
 
-	llmConfig := allConfigs.LLMs[config.LLMRef]
-	llm, err := f.llmFactory.Create(llmConfig)
+	chainConfig := allConfigs.Chains[config.ChainRef]
+	chain, err := f.chainFactory.Create(chainConfig, allConfigs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create LLM for agent: %w", err)
+		return nil, fmt.Errorf("failed to create Chain for agent: %w", err)
 	}
+
+	// 从Chain配置中获取工具(如果有)
+	tools := f.getToolsFromOptions(config.Options)
 
 	// 创建零样本智能体
 	agent := agents.NewOneShotAgent(
-		llm,
-		nil,
-		agents.WithMaxIterations(f.getMaxSteps(config)),
+		chain.(*chains.LLMChain).LLM, // 从LLMChain中获取LLM
+		tools,
+		agents.WithMaxIterations(f.getMaxIterations(config)),
+		agents.WithOutputKey(f.getOutputKey(config)),
 	)
 
 	// 创建执行器
@@ -72,40 +75,26 @@ func (f *AgentFactory) createZeroShotReactAgent(config *AgentConfig, allConfigs 
 
 // createConversationalReactAgent 创建对话ReAct智能体
 func (f *AgentFactory) createConversationalReactAgent(config *AgentConfig, allConfigs *Config) (*agents.Executor, error) {
-	// 获取LLM
-	if config.LLMRef == "" {
-		return nil, fmt.Errorf("LLM reference is required for conversational_react agent")
+	// 获取Chain
+	if config.ChainRef == "" {
+		return nil, fmt.Errorf("Chain reference is required for conversational_react agent")
 	}
 
-	llmConfig := allConfigs.LLMs[config.LLMRef]
-	llm, err := f.llmFactory.Create(llmConfig)
+	chainConfig := allConfigs.Chains[config.ChainRef]
+	chain, err := f.chainFactory.Create(chainConfig, allConfigs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create LLM for agent: %w", err)
+		return nil, fmt.Errorf("failed to create Chain for agent: %w", err)
 	}
 
-	// 获取记忆
-	var memory schema.Memory
-	if config.MemoryRef != "" {
-		memoryConfig := allConfigs.Memories[config.MemoryRef]
-		memory, err = f.memoryFactory.CreateWithLLM(memoryConfig, llm)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create Memory for agent: %w", err)
-		}
-	} else {
-		// 使用默认记忆 (simple)
-		var memErr error
-		memory, memErr = f.memoryFactory.createSimple(&MemoryConfig{Type: "simple"})
-		if memErr != nil {
-			return nil, fmt.Errorf("failed to create default simple memory: %w", memErr)
-		}
-	}
+	// 从Chain配置中获取工具(如果有)
+	tools := f.getToolsFromOptions(config.Options)
 
 	// 创建对话智能体
 	agent := agents.NewConversationalAgent(
-		llm,
-		nil,
-		agents.WithMemory(memory),
-		agents.WithMaxIterations(f.getMaxSteps(config)),
+		chain.(*chains.LLMChain).LLM, // 从LLMChain中获取LLM
+		tools,
+		agents.WithMaxIterations(f.getMaxIterations(config)),
+		agents.WithOutputKey(f.getOutputKey(config)),
 	)
 
 	// 创建执行器
@@ -114,14 +103,32 @@ func (f *AgentFactory) createConversationalReactAgent(config *AgentConfig, allCo
 	return executor, nil
 }
 
-// createTools 创建工具列表
+// getToolsFromOptions 从Options中获取工具列表
+func (f *AgentFactory) getToolsFromOptions(options map[string]interface{}) []tools.Tool {
+	if options == nil {
+		return nil
+	}
 
-// getMaxSteps 获取最大步数
-func (f *AgentFactory) getMaxSteps(config *AgentConfig) int {
-	if config.MaxSteps != nil {
-		return *config.MaxSteps
+	// 这里可以根据options中的配置创建工具
+	// 目前返回空切片，实际实现中可以根据需要添加工具解析逻辑
+	return []tools.Tool{}
+}
+
+// getMaxIterations 获取最大迭代次数
+func (f *AgentFactory) getMaxIterations(config *AgentConfig) int {
+	// 可以从Options中获取，或使用默认值
+	if maxIter, ok := config.Options["max_iterations"].(int); ok {
+		return maxIter
 	}
 	return 5 // 默认值
+}
+
+// getOutputKey 获取输出键
+func (f *AgentFactory) getOutputKey(config *AgentConfig) string {
+	if config.OutputKey != "" {
+		return config.OutputKey
+	}
+	return "output" // 默认值
 }
 
 // CreateWithComponents 使用现有组件创建Agent

@@ -28,7 +28,7 @@ func NewFactory() *Factory {
 	promptFactory := NewPromptFactory()
 	embeddingFactory := NewEmbeddingFactory()
 	chainFactory := NewChainFactory(llmFactory, memoryFactory, promptFactory)
-	agentFactory := NewAgentFactory(llmFactory, memoryFactory)
+	agentFactory := NewAgentFactory(chainFactory)
 
 	return &Factory{
 		llmFactory:       llmFactory,

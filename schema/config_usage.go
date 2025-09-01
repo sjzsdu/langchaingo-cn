@@ -355,28 +355,21 @@ func (e *ExecutorUsageConfig) ToConfig() (*Config, error) {
 			}
 		}
 
-		// 设置OutputKey
-		if e.Agent.OutputKey != "" {
-			agentConfig.Options["output_key"] = e.Agent.OutputKey
-		}
-
 		// 处理Agent的Chain配置
 		if e.Agent.Chain != nil {
-			// 对于简单的llm chain，直接提取LLM作为Agent的LLM引用
-			if e.Agent.Chain.Type == "llm" && e.Agent.Chain.LLM != nil {
-				llmName := "agent_llm"
-				config.LLMs[llmName] = e.Agent.Chain.LLM
-				agentConfig.LLMRef = llmName
-			} else {
-				// 对于复杂的chain，创建完整的chain配置
-				chainName := "agent_chain"
-				chainConfig, err := e.Agent.Chain.toChainConfig(config)
-				if err != nil {
-					return nil, fmt.Errorf("failed to convert agent chain config: %w", err)
-				}
-				config.Chains[chainName] = chainConfig
-				agentConfig.Options["chain_ref"] = chainName
+			// 创建完整的chain配置
+			chainName := "agent_chain"
+			chainConfig, err := e.Agent.Chain.toChainConfig(config)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert agent chain config: %w", err)
 			}
+			config.Chains[chainName] = chainConfig
+			agentConfig.ChainRef = chainName
+		}
+
+		// 设置OutputKey
+		if e.Agent.OutputKey != "" {
+			agentConfig.OutputKey = e.Agent.OutputKey
 		}
 
 		config.Agents[agentName] = agentConfig

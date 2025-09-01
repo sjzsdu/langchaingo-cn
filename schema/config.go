@@ -83,11 +83,10 @@ type ChainConfig struct {
 
 // AgentConfig Agent组件配置
 type AgentConfig struct {
-	Type      string                 `json:"type"`       // zero_shot_react, conversational_react
-	LLMRef    string                 `json:"llm_ref"`    // 引用的LLM组件
-	MemoryRef string                 `json:"memory_ref"` // 引用的Memory组件
-	MaxSteps  *int                   `json:"max_steps"`  // 最大步数
-	Options   map[string]interface{} `json:"options"`    // 其他选项
+	Type      string                 `json:"type"`                 // zero_shot_react, conversational_react
+	ChainRef  string                 `json:"chain_ref"`            // 引用的Chain组件
+	OutputKey string                 `json:"output_key,omitempty"` // 输出键，默认为"output"
+	Options   map[string]interface{} `json:"options,omitempty"`
 }
 
 // ExecutorConfig Executor组件配置
@@ -316,17 +315,10 @@ func (a *AgentConfig) ValidateReferences(config *Config) error {
 		return fmt.Errorf("unsupported type: %s, supported: %s", a.Type, strings.Join(supportedTypes, ", "))
 	}
 
-	// 验证LLM引用
-	if a.LLMRef != "" {
-		if _, exists := config.LLMs[a.LLMRef]; !exists {
-			return fmt.Errorf("referenced LLM '%s' not found", a.LLMRef)
-		}
-	}
-
-	// 验证Memory引用
-	if a.MemoryRef != "" {
-		if _, exists := config.Memories[a.MemoryRef]; !exists {
-			return fmt.Errorf("referenced Memory '%s' not found", a.MemoryRef)
+	// 验证Chain引用
+	if a.ChainRef != "" {
+		if _, exists := config.Chains[a.ChainRef]; !exists {
+			return fmt.Errorf("referenced Chain '%s' not found", a.ChainRef)
 		}
 	}
 

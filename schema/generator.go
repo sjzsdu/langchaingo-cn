@@ -203,19 +203,31 @@ func (g *ConfigGenerator) GenerateAgentConfig(template AgentTemplate, filename s
 				APIKey: template.LLMTemplate.APIKey,
 			},
 		},
-		Memories: map[string]*MemoryConfig{
-			"agent_memory": {
-				Type: template.MemoryType,
+		Chains: map[string]*ChainConfig{
+			"agent_chain": {
+				Type:   "conversation",
+				LLMRef: "agent_llm",
 			},
 		},
 		Agents: map[string]*AgentConfig{
 			"main_agent": {
-				Type:      template.Type,
-				LLMRef:    "agent_llm",
-				MemoryRef: "agent_memory",
-				MaxSteps:  &template.MaxSteps,
+				Type:     template.Type,
+				ChainRef: "agent_chain",
 			},
 		},
+	}
+
+	// 对于conversation类型的agent，添加memory配置
+	if template.Type == "conversational_react" {
+		config.Memories = map[string]*MemoryConfig{
+			"agent_memory": {
+				Type: template.MemoryType,
+			},
+		}
+		config.Chains["agent_chain"].MemoryRef = "agent_memory"
+	} else {
+		// 对于零样本agent，使用简单的llm chain
+		config.Chains["agent_chain"].Type = "llm"
 	}
 
 	// 设置LLM可选参数

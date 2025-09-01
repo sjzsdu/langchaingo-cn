@@ -134,9 +134,13 @@ func TestConfigGenerator(t *testing.T) {
 		assert.Len(t, config.Agents, 1)
 		agent := config.Agents["main_agent"]
 		assert.Equal(t, "zero_shot_react", agent.Type)
-		assert.Equal(t, "agent_llm", agent.LLMRef)
-		assert.Equal(t, "agent_memory", agent.MemoryRef)
-		assert.Equal(t, 3, *agent.MaxSteps)
+		assert.Equal(t, "agent_chain", agent.ChainRef)
+
+		// 验证Chain配置
+		assert.Len(t, config.Chains, 1)
+		chain := config.Chains["agent_chain"]
+		assert.Equal(t, "llm", chain.Type)
+		assert.Equal(t, "agent_llm", chain.LLMRef)
 	})
 
 	t.Run("生成Executor配置", func(t *testing.T) {
