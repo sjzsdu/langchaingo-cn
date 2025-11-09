@@ -50,12 +50,12 @@ func (f *AgentFactory) createZeroShotReactAgent(config *AgentConfig, allConfigs 
 	}
 
 	chainConfig := allConfigs.Chains[config.ChainRef]
-	
+
 	// 直接从Chain配置中获取LLM，而不是从Chain对象中提取
 	if chainConfig.LLMRef == "" {
 		return nil, fmt.Errorf("LLM reference is required in chain for zero_shot_react agent")
 	}
-	
+
 	llmConfig := allConfigs.LLMs[chainConfig.LLMRef]
 	llm, err := f.chainFactory.llmFactory.Create(llmConfig)
 	if err != nil {
@@ -87,12 +87,12 @@ func (f *AgentFactory) createConversationalReactAgent(config *AgentConfig, allCo
 	}
 
 	chainConfig := allConfigs.Chains[config.ChainRef]
-	
+
 	// 直接从Chain配置中获取LLM，而不是从Chain对象中提取
 	if chainConfig.LLMRef == "" {
 		return nil, fmt.Errorf("LLM reference is required in chain for conversational_react agent")
 	}
-	
+
 	llmConfig := allConfigs.LLMs[chainConfig.LLMRef]
 	llm, err := f.chainFactory.llmFactory.Create(llmConfig)
 	if err != nil {

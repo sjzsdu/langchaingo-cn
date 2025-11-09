@@ -8,6 +8,7 @@ import (
 	"github.com/sjzsdu/langchaingo-cn/llms/deepseek"
 	"github.com/sjzsdu/langchaingo-cn/llms/kimi"
 	"github.com/sjzsdu/langchaingo-cn/llms/qwen"
+	"github.com/sjzsdu/langchaingo-cn/llms/zhipu"
 	"github.com/tmc/langchaingo/embeddings"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/huggingface"
@@ -56,6 +57,16 @@ func InitTextModels(llm string) ([]llms.Model, []string, error) {
 		}
 		models = append(models, kimiLLM)
 		modelNames = append(modelNames, "Kimi")
+	}
+
+	// 初始化智谱AI客户端
+	if matchModelName(llm, "Zhipu") {
+		zhipuLLM, err := zhipu.New()
+		if err != nil {
+			return nil, nil, fmt.Errorf("初始化智谱AI失败: %w", err)
+		}
+		models = append(models, zhipuLLM)
+		modelNames = append(modelNames, "Zhipu")
 	}
 
 	// 如果没有找到任何模型，返回错误
@@ -108,6 +119,18 @@ func InitImageModels(llm string) ([]llms.Model, []string, error) {
 		}
 		models = append(models, kimiLLM)
 		modelNames = append(modelNames, "Kimi")
+	}
+
+	// 初始化智谱AI客户端 - 使用支持多模态的模型
+	if matchModelName(llm, "Zhipu") {
+		zhipuLLM, err := zhipu.New(
+			zhipu.WithModel(zhipu.ModelGLM4V), // 使用支持视觉的模型
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("初始化智谱AI失败: %w", err)
+		}
+		models = append(models, zhipuLLM)
+		modelNames = append(modelNames, "Zhipu")
 	}
 
 	// 如果没有找到任何模型，返回错误
@@ -165,6 +188,22 @@ func InitEmbeddingModels(llm string) ([]embeddings.Embedder, []string, error) {
 		}
 		models = append(models, e)
 		modelNames = append(modelNames, "Qwen")
+	}
+
+	// Zhipu: embedding-2
+	if matchModelName(llm, "Zhipu") {
+		zhipuLLM, err := zhipu.New(
+			zhipu.WithEmbeddingModel("embedding-2"),
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("初始化智谱AI Embedding失败: %w", err)
+		}
+		e, err := embeddings.NewEmbedder(zhipuLLM)
+		if err != nil {
+			return nil, nil, fmt.Errorf("智谱AI Embedder 创建失败: %w", err)
+		}
+		models = append(models, e)
+		modelNames = append(modelNames, "Zhipu")
 	}
 
 	// Ollama: bge-m3

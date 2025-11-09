@@ -1,12 +1,12 @@
 module github.com/sjzsdu/langchaingo-cn/examples/deepseek-tool-call-example
 
-go 1.22.0
+go 1.23.8
 
 toolchain go1.24.0
 
 require (
 	github.com/sjzsdu/langchaingo-cn v0.0.0-00010101000000-000000000000
-	github.com/tmc/langchaingo v0.1.13
+	github.com/tmc/langchaingo v0.1.14-pre.3
 )
 
 require (
