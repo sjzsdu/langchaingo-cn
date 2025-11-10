@@ -7,6 +7,8 @@ import (
 	"github.com/sjzsdu/langchaingo-cn/llms/deepseek"
 	"github.com/sjzsdu/langchaingo-cn/llms/kimi"
 	"github.com/sjzsdu/langchaingo-cn/llms/qwen"
+	"github.com/sjzsdu/langchaingo-cn/llms/siliconflow"
+	"github.com/sjzsdu/langchaingo-cn/llms/zhipu"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/anthropic"
 	"github.com/tmc/langchaingo/llms/ollama"
@@ -18,12 +20,14 @@ type LLMType string
 
 // 支持的LLM类型常量
 const (
-	DeepSeekLLM  LLMType = "deepseek"
-	KimiLLM      LLMType = "kimi"
-	QwenLLM      LLMType = "qwen"
-	AnthropicLLM LLMType = "anthropic"
-	OpenAILLM    LLMType = "openai"
-	OllamaLLM    LLMType = "ollama"
+	DeepSeekLLM     LLMType = "deepseek"
+	KimiLLM         LLMType = "kimi"
+	QwenLLM         LLMType = "qwen"
+	ZhipuLLM        LLMType = "zhipu"
+	SiliconFlowLLM  LLMType = "siliconflow"
+	AnthropicLLM    LLMType = "anthropic"
+	OpenAILLM       LLMType = "openai"
+	OllamaLLM       LLMType = "ollama"
 )
 
 // ErrUnsupportedLLMType 表示不支持的LLM类型错误
@@ -61,6 +65,10 @@ func CreateLLM(llmType LLMType, params map[string]interface{}) (llms.Model, erro
 		return createKimiLLM(params)
 	case QwenLLM:
 		return createQwenLLM(params)
+	case ZhipuLLM:
+		return createZhipuLLM(params)
+	case SiliconFlowLLM:
+		return createSiliconFlowLLM(params)
 	case AnthropicLLM:
 		return createAnthropicLLM(params)
 	case OpenAILLM:
@@ -169,6 +177,58 @@ func createQwenLLM(params map[string]interface{}) (*qwen.LLM, error) {
 	}
 	// 创建LLM实例
 	return qwen.New(opts...)
+}
+
+// createZhipuLLM 创建智谱AI LLM实例
+func createZhipuLLM(params map[string]interface{}) (*zhipu.LLM, error) {
+	// 构建选项
+	opts := []zhipu.Option{}
+
+	// 添加参数
+	if apiKey, ok := params["api_key"].(string); ok && apiKey != "" {
+		opts = append(opts, zhipu.WithAPIKey(apiKey))
+	}
+
+	if model, ok := params["model"].(string); ok && model != "" {
+		opts = append(opts, zhipu.WithModel(model))
+	}
+
+	if baseURL, ok := params["base_url"].(string); ok && baseURL != "" {
+		opts = append(opts, zhipu.WithBaseURL(baseURL))
+	}
+
+	if embeddingModel, ok := params["embedding_model"].(string); ok && embeddingModel != "" {
+		opts = append(opts, zhipu.WithEmbeddingModel(embeddingModel))
+	}
+
+	// 创建LLM实例
+	return zhipu.New(opts...)
+}
+
+// createSiliconFlowLLM 创建硅基流动 LLM实例
+func createSiliconFlowLLM(params map[string]interface{}) (*siliconflow.LLM, error) {
+	// 构建选项
+	opts := []siliconflow.Option{}
+
+	// 添加参数
+	if apiKey, ok := params["api_key"].(string); ok && apiKey != "" {
+		opts = append(opts, siliconflow.WithAPIKey(apiKey))
+	}
+
+	if model, ok := params["model"].(string); ok && model != "" {
+		opts = append(opts, siliconflow.WithModel(model))
+	}
+
+	if baseURL, ok := params["base_url"].(string); ok && baseURL != "" {
+		opts = append(opts, siliconflow.WithBaseURL(baseURL))
+	}
+
+	if embeddingModel, ok := params["embedding_model"].(string); ok && embeddingModel != "" {
+		opts = append(opts, siliconflow.WithEmbeddingModel(embeddingModel))
+	}
+
+	// 创建LLM实例
+	return siliconflow.New(opts...)
 }
 
 // createOpenAILLM 创建OpenAI LLM实例

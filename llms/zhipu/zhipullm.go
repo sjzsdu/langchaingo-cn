@@ -143,19 +143,33 @@ func New(opts ...Option) (*LLM, error) {
 	return &LLM{LLM: openaiLLM}, nil
 }
 
+// GetModels 返回智谱AI支持的模型列表
+func (z *LLM) GetModels() []string {
+	return []string{
+		ModelGLM4,
+		ModelGLM4V,
+		ModelGLM4Air,
+		ModelGLM4AirX,
+		ModelGLM4Flash,
+		ModelGLM3Turbo,
+		ModelCharGLM3,
+		ModelCogView3,
+	}
+}
+
 // GenerateContent 重写生成内容方法，自动处理system消息转换
 func (z *LLM) GenerateContent(ctx context.Context, messages []llms.MessageContent, options ...llms.CallOption) (*llms.ContentResponse, error) {
 	// 转换system消息为user消息，因为智谱AI不支持system角色
 	convertedMessages := make([]llms.MessageContent, 0, len(messages))
-	
+
 	for _, msg := range messages {
 		if msg.Role == llms.ChatMessageTypeSystem {
 			// 将system消息转换为user消息，并在内容前添加提示
 			convertedMsg := llms.MessageContent{
-				Role: llms.ChatMessageTypeHuman,
+				Role:  llms.ChatMessageTypeHuman,
 				Parts: make([]llms.ContentPart, 0, len(msg.Parts)),
 			}
-			
+
 			// 处理每个部分
 			for i, part := range msg.Parts {
 				switch p := part.(type) {
@@ -177,7 +191,7 @@ func (z *LLM) GenerateContent(ctx context.Context, messages []llms.MessageConten
 			convertedMessages = append(convertedMessages, msg)
 		}
 	}
-	
+
 	// 调用父类方法
 	return z.LLM.GenerateContent(ctx, convertedMessages, options...)
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/sjzsdu/langchaingo-cn/llms/deepseek"
 	"github.com/sjzsdu/langchaingo-cn/llms/kimi"
 	"github.com/sjzsdu/langchaingo-cn/llms/qwen"
+	"github.com/sjzsdu/langchaingo-cn/llms/siliconflow"
 	"github.com/sjzsdu/langchaingo-cn/llms/zhipu"
 	"github.com/tmc/langchaingo/embeddings"
 	"github.com/tmc/langchaingo/llms"
@@ -67,6 +68,16 @@ func InitTextModels(llm string) ([]llms.Model, []string, error) {
 		}
 		models = append(models, zhipuLLM)
 		modelNames = append(modelNames, "Zhipu")
+	}
+
+	// 初始化硅基流动客户端
+	if matchModelName(llm, "SiliconFlow") {
+		siliconflowLLM, err := siliconflow.New()
+		if err != nil {
+			return nil, nil, fmt.Errorf("初始化硅基流动失败: %w", err)
+		}
+		models = append(models, siliconflowLLM)
+		modelNames = append(modelNames, "SiliconFlow")
 	}
 
 	// 如果没有找到任何模型，返回错误
@@ -131,6 +142,18 @@ func InitImageModels(llm string) ([]llms.Model, []string, error) {
 		}
 		models = append(models, zhipuLLM)
 		modelNames = append(modelNames, "Zhipu")
+	}
+
+	// 初始化硅基流动客户端 - 使用支持多模态的模型
+	if matchModelName(llm, "SiliconFlow") {
+		siliconflowLLM, err := siliconflow.New(
+			siliconflow.WithModel(siliconflow.ModelQwenVLMax), // 使用支持视觉的模型
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("初始化硅基流动失败: %w", err)
+		}
+		models = append(models, siliconflowLLM)
+		modelNames = append(modelNames, "SiliconFlow")
 	}
 
 	// 如果没有找到任何模型，返回错误
@@ -204,6 +227,22 @@ func InitEmbeddingModels(llm string) ([]embeddings.Embedder, []string, error) {
 		}
 		models = append(models, e)
 		modelNames = append(modelNames, "Zhipu")
+	}
+
+	// SiliconFlow: bge-large-zh-v1.5
+	if matchModelName(llm, "SiliconFlow") {
+		siliconflowLLM, err := siliconflow.New(
+			siliconflow.WithEmbeddingModel("BAAI/bge-large-zh-v1.5"),
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("初始化硅基流动 Embedding失败: %w", err)
+		}
+		e, err := embeddings.NewEmbedder(siliconflowLLM)
+		if err != nil {
+			return nil, nil, fmt.Errorf("硅基流动 Embedder 创建失败: %w", err)
+		}
+		models = append(models, e)
+		modelNames = append(modelNames, "SiliconFlow")
 	}
 
 	// Ollama: bge-m3

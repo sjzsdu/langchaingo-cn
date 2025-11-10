@@ -87,6 +87,16 @@ func newClient(opts ...Option) (*deepseekclient.Client, error) {
 	)
 }
 
+// GetModels 返回DeepSeek支持的模型列表
+func (o *LLM) GetModels() []string {
+	return []string{
+		"deepseek-chat",        // DeepSeek聊天模型
+		"deepseek-coder",       // DeepSeek代码模型
+		"deepseek-reasoner",    // DeepSeek推理模型（支持思维链）
+		"deepseek-vision",      // DeepSeek视觉模型（多模态）
+	}
+}
+
 // Call requests a completion for the given prompt.
 func (o *LLM) Call(ctx context.Context, prompt string, options ...llms.CallOption) (string, error) {
 	return llms.GenerateFromSinglePrompt(ctx, o, prompt, options...)

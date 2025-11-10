@@ -21,6 +21,9 @@ export QWEN_API_KEY="your-qwen-api-key"
 # Kimi (月之暗面)
 export KIMI_API_KEY="your-kimi-api-key"
 
+# 硅基流动
+export SILICONFLOW_API_KEY="your-siliconflow-api-key"
+
 # OpenAI (可选，用于对比测试)
 export OPENAI_API_KEY="your-openai-api-key"
 ```
@@ -33,10 +36,38 @@ export OPENAI_API_KEY="your-openai-api-key"
 | DeepSeek | `DeepSeek` | `DEEPSEEK_API_KEY` | DeepSeek-Chat、DeepSeek-Vision等 |
 | 通义千问 | `Qwen` | `QWEN_API_KEY` | Qwen-Max、Qwen-VL等模型 |
 | Kimi | `Kimi` | `KIMI_API_KEY` | Moonshot系列模型 |
+| 硅基流动 | `SiliconFlow` | `SILICONFLOW_API_KEY` | 多种开源模型集合平台 |
 
 ## 📚 示例目录
 
-### 1. 文本补全示例 (`completion/`)
+### 1. 模型列表示例 (`model-list/`)
+
+**功能**: 展示各个LLM支持的模型列表
+
+**使用方法**:
+```bash
+cd model-list
+
+# 查看所有支持的模型
+go run main.go
+```
+
+**示例功能**:
+- 列出智谱AI支持的所有模型
+- 列出DeepSeek支持的所有模型  
+- 列出通义千问支持的所有模型
+- 列出Kimi支持的所有模型
+- 列出硅基流动支持的文本生成、多模态和Embedding模型
+- 展示如何使用GetModels()方法
+
+**支持的LLM**:
+- 智谱AI: GLM-4、GLM-4V、GLM-4-Air等8个模型
+- DeepSeek: deepseek-chat、deepseek-coder等4个模型
+- 通义千问: qwen-turbo、qwen-plus、qwen-max等5个模型
+- Kimi: moonshot-v1-8k、moonshot-v1-32k、moonshot-v1-128k
+- 硅基流动: 16个文本生成模型 + 3个多模态模型 + 4个Embedding模型
+
+### 2. 文本补全示例 (`completion/`)
 
 **功能**: 展示基础的文本生成和对话功能
 
@@ -49,9 +80,10 @@ go run main.go
 
 # 测试特定模型
 go run main.go Zhipu     # 智谱AI
-go run main.go DeepSeek  # DeepSeek  
-go run main.go Qwen      # 通义千问
-go run main.go Kimi      # Kimi
+go run main.go DeepSeek     # DeepSeek  
+go run main.go Qwen        # 通义千问
+go run main.go Kimi        # Kimi
+go run main.go SiliconFlow # 硅基流动
 ```
 
 **示例功能**:
@@ -74,6 +106,7 @@ go run main.go
 
 # 测试特定模型的流式输出
 go run main.go Zhipu
+go run main.go SiliconFlow
 ```
 
 **示例功能**:
@@ -100,8 +133,9 @@ cd embedding
 go run main.go
 
 # 测试特定模型
-go run main.go Qwen    # 通义千问embedding
-go run main.go Zhipu   # 智谱AI embedding
+go run main.go Qwen        # 通义千问embedding
+go run main.go Zhipu       # 智谱AI embedding
+go run main.go SiliconFlow # 硅基流动embedding
 ```
 
 **示例功能**:
@@ -129,9 +163,10 @@ cd multi-modal
 go run main.go
 
 # 测试特定模型
-go run main.go Zhipu   # GLM-4V
-go run main.go Qwen    # Qwen-VL
-go run main.go Kimi    # Moonshot-Vision
+go run main.go Zhipu       # GLM-4V
+go run main.go Qwen        # Qwen-VL
+go run main.go Kimi        # Moonshot-Vision
+go run main.go SiliconFlow # Qwen2-VL等
 ```
 
 **示例功能**:
@@ -144,6 +179,7 @@ go run main.go Kimi    # Moonshot-Vision
 - 通义千问: Qwen-VL-Max
 - Kimi: Moonshot-Vision
 - DeepSeek: DeepSeek-Vision
+- 硅基流动: Qwen2-VL、InternVL2等
 
 ---
 

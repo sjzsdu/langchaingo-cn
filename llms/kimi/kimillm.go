@@ -139,6 +139,15 @@ func New(opts ...Option) (*LLM, error) {
 	}, nil
 }
 
+// GetModels 返回Kimi支持的模型列表
+func (o *LLM) GetModels() []string {
+	return []string{
+		ModelKimiV1,     // moonshot-v1-8k
+		ModelKimiV1Pro,  // moonshot-v1-32k
+		ModelKimiV1Plus, // moonshot-v1-128k
+	}
+}
+
 // Call 调用Kimi API生成文本
 func (o *LLM) Call(ctx context.Context, prompt string, options ...llms.CallOption) (string, error) {
 	// 处理调用选项

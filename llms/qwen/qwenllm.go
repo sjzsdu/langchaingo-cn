@@ -131,3 +131,14 @@ func New(opts ...Option) (*LLM, error) {
 
 	return &LLM{LLM: openaiLLM}, nil
 }
+
+// GetModels 返回通义千问支持的模型列表
+func (q *LLM) GetModels() []string {
+	return []string{
+		ModelQWenTurbo,
+		ModelQWenPlus,
+		ModelQWenMax,
+		ModelQWenVLPlus,
+		ModelQWenVLMax,
+	}
+}
