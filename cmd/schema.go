@@ -49,6 +49,8 @@ var configGenCmd = &cobra.Command{
   • kimi        - Kimi月之暗面模型
   • openai      - OpenAI GPT模型
   • qwen        - 通义千问模型
+  • zhipu       - 智谱AI GLM模型
+  • siliconflow - 硅基流动平台模型
   • anthropic   - Anthropic Claude模型
   • ollama      - 本地Ollama模型`,
 	Example: `  # 生成DeepSeek聊天配置
@@ -68,7 +70,7 @@ var configGenCmd = &cobra.Command{
 var llmCmd = &cobra.Command{
 	Use:   "llm",
 	Short: "生成LLM配置文件",
-	Long:  "生成大语言模型(LLM)的配置文件，支持DeepSeek、Kimi、OpenAI等模型",
+	Long:  "生成大语言模型(LLM)的配置文件，支持DeepSeek、Kimi、OpenAI、智谱AI、硅基流动等模型",
 	Example: `  # 生成DeepSeek配置
   config-gen llm --llm deepseek --model deepseek-chat
 
@@ -256,15 +258,18 @@ var presetCmd = &cobra.Command{
 	Short:     "生成预设配置文件",
 	Long:      "使用预定义的配置模板快速生成常用配置文件",
 	Args:      cobra.ExactArgs(1),
-	ValidArgs: []string{"deepseek-chat", "kimi-chat", "openai-chat", "qwen-chat", "deepseek-executor"},
+	ValidArgs: []string{"deepseek-chat", "kimi-chat", "openai-chat", "qwen-chat", "zhipu-chat", "siliconflow-chat", "deepseek-executor", "zhipu-executor", "siliconflow-executor"},
 	Example: `  # 生成DeepSeek聊天配置
   config-gen preset deepseek-chat -o deepseek.json
 
-  # 生成Kimi聊天配置
-  config-gen preset kimi-chat -o kimi.json
+  # 生成智谱AI聊天配置
+  config-gen preset zhipu-chat -o zhipu.json
 
-  # 生成DeepSeek执行器配置
-  config-gen preset deepseek-executor -o executor.json`,
+  # 生成硅基流动聊天配置
+  config-gen preset siliconflow-chat -o siliconflow.json
+
+  # 生成智谱AI执行器配置
+  config-gen preset zhipu-executor -o executor.json`,
 	Run: func(cmd *cobra.Command, args []string) {
 		preset := args[0]
 		generator := schema.NewConfigGenerator(outputDir)
@@ -284,17 +289,23 @@ var listCmd = &cobra.Command{
 	Long:  "显示所有可用的预设配置、支持的LLM类型、Chain类型等信息",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("📋 可用的预设配置:")
-		fmt.Println("  • deepseek-chat     - DeepSeek聊天配置")
-		fmt.Println("  • kimi-chat         - Kimi聊天配置")
-		fmt.Println("  • openai-chat       - OpenAI聊天配置")
-		fmt.Println("  • qwen-chat         - 通义千问聊天配置")
-		fmt.Println("  • deepseek-executor - DeepSeek执行器配置")
+		fmt.Println("  • deepseek-chat       - DeepSeek聊天配置")
+		fmt.Println("  • kimi-chat           - Kimi聊天配置")
+		fmt.Println("  • openai-chat         - OpenAI聊天配置")
+		fmt.Println("  • qwen-chat           - 通义千问聊天配置")
+		fmt.Println("  • zhipu-chat          - 智谱AI聊天配置")
+		fmt.Println("  • siliconflow-chat    - 硅基流动聊天配置")
+		fmt.Println("  • deepseek-executor   - DeepSeek执行器配置")
+		fmt.Println("  • zhipu-executor      - 智谱AI执行器配置")
+		fmt.Println("  • siliconflow-executor - 硅基流动执行器配置")
 
 		fmt.Println("\n🤖 支持的LLM类型:")
 		fmt.Println("  • deepseek    - DeepSeek模型")
 		fmt.Println("  • kimi        - Kimi月之暗面模型")
 		fmt.Println("  • openai      - OpenAI GPT模型")
 		fmt.Println("  • qwen        - 通义千问模型")
+		fmt.Println("  • zhipu       - 智谱AI GLM模型")
+		fmt.Println("  • siliconflow - 硅基流动平台模型")
 		fmt.Println("  • anthropic   - Anthropic Claude模型")
 		fmt.Println("  • ollama      - 本地Ollama模型")
 
@@ -400,8 +411,16 @@ func generatePreset(generator *schema.ConfigGenerator, preset, output string) er
 		return generator.GenerateOpenAIChatConfig(output)
 	case "qwen-chat":
 		return generator.GenerateQwenChatConfig(output)
+	case "zhipu-chat":
+		return generator.GenerateZhipuChatConfig(output)
+	case "siliconflow-chat":
+		return generator.GenerateSiliconFlowChatConfig(output)
 	case "deepseek-executor":
 		return generator.GenerateExecutorWithDeepSeek(output)
+	case "zhipu-executor":
+		return generator.GenerateExecutorWithZhipu(output)
+	case "siliconflow-executor":
+		return generator.GenerateExecutorWithSiliconFlow(output)
 	default:
 		return fmt.Errorf("不支持的预设配置: %s", preset)
 	}

@@ -13,6 +13,8 @@ import (
 	"github.com/sjzsdu/langchaingo-cn/llms/deepseek"
 	"github.com/sjzsdu/langchaingo-cn/llms/kimi"
 	"github.com/sjzsdu/langchaingo-cn/llms/qwen"
+	"github.com/sjzsdu/langchaingo-cn/llms/siliconflow"
+	"github.com/sjzsdu/langchaingo-cn/llms/zhipu"
 )
 
 // LLMFactory LLM组件工厂
@@ -49,6 +51,10 @@ func (f *LLMFactory) Create(config *LLMConfig) (llms.Model, error) {
 		return f.createKimi(config, apiKey)
 	case "qwen":
 		return f.createQwen(config, apiKey)
+	case "zhipu":
+		return f.createZhipu(config, apiKey)
+	case "siliconflow":
+		return f.createSiliconFlow(config, apiKey)
 	case "anthropic":
 		return f.createAnthropic(config, apiKey)
 	case "ollama":
@@ -176,6 +182,56 @@ func (f *LLMFactory) createQwen(config *LLMConfig, apiKey string) (llms.Model, e
 	return qwen.New(opts...)
 }
 
+// createZhipu 创建智谱AI LLM
+func (f *LLMFactory) createZhipu(config *LLMConfig, apiKey string) (llms.Model, error) {
+	var opts []zhipu.Option
+
+	// 设置API密钥
+	if apiKey != "" {
+		opts = append(opts, zhipu.WithAPIKey(apiKey))
+	}
+
+	// 设置模型
+	if config.Model != "" {
+		opts = append(opts, zhipu.WithModel(config.Model))
+	}
+
+	// 设置基础URL
+	if config.BaseURL != "" {
+		opts = append(opts, zhipu.WithBaseURL(config.BaseURL))
+	}
+
+	// 处理其他选项
+	f.applyZhipuOptions(&opts, config.Options)
+
+	return zhipu.New(opts...)
+}
+
+// createSiliconFlow 创建硅基流动 LLM
+func (f *LLMFactory) createSiliconFlow(config *LLMConfig, apiKey string) (llms.Model, error) {
+	var opts []siliconflow.Option
+
+	// 设置API密钥
+	if apiKey != "" {
+		opts = append(opts, siliconflow.WithAPIKey(apiKey))
+	}
+
+	// 设置模型
+	if config.Model != "" {
+		opts = append(opts, siliconflow.WithModel(config.Model))
+	}
+
+	// 设置基础URL
+	if config.BaseURL != "" {
+		opts = append(opts, siliconflow.WithBaseURL(config.BaseURL))
+	}
+
+	// 处理其他选项
+	f.applySiliconFlowOptions(&opts, config.Options)
+
+	return siliconflow.New(opts...)
+}
+
 // createAnthropic 创建Anthropic LLM
 func (f *LLMFactory) createAnthropic(config *LLMConfig, apiKey string) (llms.Model, error) {
 	var opts []anthropic.Option
@@ -226,6 +282,10 @@ func (f *LLMFactory) getDefaultAPIKey(llmType string) string {
 		return os.Getenv("KIMI_API_KEY")
 	case "qwen":
 		return os.Getenv("QWEN_API_KEY")
+	case "zhipu":
+		return os.Getenv("ZHIPU_API_KEY")
+	case "siliconflow":
+		return os.Getenv("SILICONFLOW_API_KEY")
 	case "anthropic":
 		return os.Getenv("ANTHROPIC_API_KEY")
 	default:
@@ -291,5 +351,46 @@ func (f *LLMFactory) applyQwenOptions(opts *[]qwen.Option, options map[string]in
 	if timeout, ok := options["timeout"].(float64); ok && timeout > 0 {
 		// 可以添加超时设置选项
 		_ = timeout
+	}
+
+	// 处理嵌入模型
+	if embModel, ok := options["embedding_model"].(string); ok && embModel != "" {
+		*opts = append(*opts, qwen.WithEmbeddingModel(embModel))
+	}
+}
+
+// applyZhipuOptions 应用智谱AI特定选项
+func (f *LLMFactory) applyZhipuOptions(opts *[]zhipu.Option, options map[string]interface{}) {
+	if options == nil {
+		return
+	}
+
+	// 处理HTTP客户端超时
+	if timeout, ok := options["timeout"].(float64); ok && timeout > 0 {
+		// 可以添加超时设置选项
+		_ = timeout
+	}
+
+	// 处理嵌入模型
+	if embModel, ok := options["embedding_model"].(string); ok && embModel != "" {
+		*opts = append(*opts, zhipu.WithEmbeddingModel(embModel))
+	}
+}
+
+// applySiliconFlowOptions 应用硅基流动特定选项
+func (f *LLMFactory) applySiliconFlowOptions(opts *[]siliconflow.Option, options map[string]interface{}) {
+	if options == nil {
+		return
+	}
+
+	// 处理HTTP客户端超时
+	if timeout, ok := options["timeout"].(float64); ok && timeout > 0 {
+		// 可以添加超时设置选项
+		_ = timeout
+	}
+
+	// 处理嵌入模型
+	if embModel, ok := options["embedding_model"].(string); ok && embModel != "" {
+		*opts = append(*opts, siliconflow.WithEmbeddingModel(embModel))
 	}
 }

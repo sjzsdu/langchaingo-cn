@@ -1,0 +1,25 @@
+{
+  "agent": {
+    "type": "zero_shot_react",
+    "chain": {
+      "type": "llm",
+      "llm": {
+        "type": "zhipu",
+        "model": "glm-4",
+        "api_key": "${ZHIPU_API_KEY}",
+        "base_url": "",
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "options": null
+      },
+      "memory": {
+        "type": "conversation_buffer"
+      }
+    },
+    "options": {
+      "max_steps": 5
+    }
+  },
+  "max_iterations": 10,
+  "return_intermediate_steps": true
+}

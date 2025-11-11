@@ -18,6 +18,8 @@ Schema 包为 LangChainGo-CN 提供了一个强大的配置驱动组件工厂系
 - `deepseek`: DeepSeek 模型
 - `kimi`: Kimi 月之暗面模型
 - `qwen`: 通义千问模型
+- `zhipu`: 智谱AI GLM 模型 🆕
+- `siliconflow`: 硅基流动平台模型 🆕
 - `anthropic`: Anthropic Claude 模型
 - `ollama`: 本地 Ollama 模型
 
@@ -46,6 +48,30 @@ Schema 包为 LangChainGo-CN 提供了一个强大的配置驱动组件工厂系
 ### Agent 组件
 - `zero_shot_react`: 零样本 ReAct 智能体
 - `conversational_react`: 对话式 ReAct 智能体
+
+## 模型列表查询
+
+所有LLM实现都提供了 `GetModels()` 方法来枚举支持的模型列表：
+
+```go
+import (
+    "fmt"
+    "github.com/tmc/langchaingo-cn/llms/zhipu"
+    "github.com/tmc/langchaingo-cn/llms/siliconflow"
+)
+
+// 获取智谱AI支持的模型
+zhipuLLM, _ := zhipu.New(zhipu.WithAPIKey("your-key"))
+models := zhipuLLM.GetModels()
+fmt.Printf("智谱AI模型: %v\n", models)
+// 输出: [glm-4 glm-4v glm-3-turbo]
+
+// 获取硅基流动支持的模型
+sfLLM, _ := siliconflow.New(siliconflow.WithAPIKey("your-key"))
+models = sfLLM.GetModels()
+fmt.Printf("硅基流动模型: %v\n", models)
+// 输出: [Qwen/Qwen2-7B-Instruct deepseek-ai/DeepSeek-V2-Chat ...]
+```
 
 ## 配置生成器 🚀
 
@@ -101,6 +127,54 @@ generator.GenerateChainConfig(schema.ChainTemplate{
 }, "custom_chain.json")
 ```
 
+## 命令行工具
+
+Schema 包提供了方便的命令行工具来快速生成配置文件：
+
+### 基本用法
+
+```bash
+# 生成预设配置
+go run main.go config-gen preset [preset-type] -o [output-file]
+
+# 查看支持的命令和选项
+go run main.go config-gen --help
+
+# 列出所有可用的预设类型
+go run main.go config-gen list
+```
+
+### 支持的预设类型
+
+- `deepseek-chat`: DeepSeek 聊天配置
+- `deepseek-executor`: DeepSeek 执行器配置
+- `kimi-chat`: Kimi 聊天配置
+- `openai-chat`: OpenAI 聊天配置
+- `qwen-chat`: 通义千问聊天配置
+- `zhipu-chat`: 智谱AI 聊天配置 🆕
+- `zhipu-executor`: 智谱AI 执行器配置 🆕
+- `siliconflow-chat`: 硅基流动 聊天配置 🆕
+- `siliconflow-executor`: 硅基流动 执行器配置 🆕
+
+### 示例命令
+
+```bash
+# 生成智谱AI聊天配置
+go run main.go config-gen preset zhipu-chat -o zhipu_config.json
+
+# 生成硅基流动执行器配置
+go run main.go config-gen preset siliconflow-executor -o sf_executor.json
+
+# 生成DeepSeek聊天配置
+go run main.go config-gen preset deepseek-chat -o deepseek_config.json
+
+# 生成自定义LLM配置
+go run main.go config-gen llm --llm zhipu --model glm-4 -o custom_zhipu.json
+
+# 生成Chain配置
+go run main.go config-gen chain --llm siliconflow --model Qwen/Qwen2-7B-Instruct -o sf_chain.json
+```
+
 ### 预设配置快捷方法
 
 ```go
@@ -118,6 +192,14 @@ generator.GenerateReactAgentConfig("openai", "gpt-4", "openai_agent.json")
 
 // 通义千问相关
 generator.GenerateQwenChatConfig("qwen_chat.json")
+
+// 智谱AI相关 🆕
+generator.GenerateZhipuChatConfig("zhipu_chat.json")
+generator.GenerateExecutorWithZhipu("zhipu_executor.json")
+
+// 硅基流动相关 🆕
+generator.GenerateSiliconFlowChatConfig("siliconflow_chat.json")
+generator.GenerateExecutorWithSiliconFlow("siliconflow_executor.json")
 ```
 
 ## 快速开始
@@ -147,6 +229,7 @@ func main() {
 
 ### 2. JSON 配置示例
 
+#### DeepSeek 配置示例
 ```json
 {
   "llms": {
@@ -166,8 +249,64 @@ func main() {
   "chains": {
     "chat_chain": {
       "type": "conversation",
-      "llm_ref": "main_llm",
-      "memory_ref": "chat_memory"
+      "llm": "main_llm",
+      "memory": "chat_memory"
+    }
+  }
+}
+```
+
+#### 智谱AI 完整配置示例 🆕
+```json
+{
+  "llms": {
+    "zhipu_llm": {
+      "type": "zhipu",
+      "model": "glm-4",
+      "api_key": "${ZHIPU_API_KEY}",
+      "temperature": 0.9,
+      "max_tokens": 1024
+    }
+  },
+  "memories": {
+    "chat_memory": {
+      "type": "conversation_buffer",
+      "max_messages": 20
+    }
+  },
+  "chains": {
+    "zhipu_chain": {
+      "type": "conversation",
+      "llm": "zhipu_llm", 
+      "memory": "chat_memory"
+    }
+  }
+}
+```
+
+#### 硅基流动 完整配置示例 🆕
+```json
+{
+  "llms": {
+    "siliconflow_llm": {
+      "type": "siliconflow",
+      "model": "Qwen/Qwen2-7B-Instruct",
+      "api_key": "${SILICONFLOW_API_KEY}",
+      "temperature": 0.7,
+      "max_tokens": 2048
+    }
+  },
+  "memories": {
+    "chat_memory": {
+      "type": "conversation_buffer",
+      "max_messages": 15
+    }
+  },
+  "chains": {
+    "sf_chain": {
+      "type": "conversation",
+      "llm": "siliconflow_llm",
+      "memory": "chat_memory"
     }
   }
 }
@@ -191,17 +330,40 @@ if chain, exists := app.Chains["chat_chain"]; exists {
 
 ### LLM 配置
 
+#### OpenAI 配置示例
 ```json
 {
   "type": "openai",           // 必需：LLM 类型
   "model": "gpt-4",          // 必需：模型名称
-  "api_key": "${API_KEY}",   // API 密钥（支持环境变量）
+  "api_key": "${OPENAI_API_KEY}",   // API 密钥（支持环境变量）
   "base_url": "https://...", // 可选：自定义 API 基础 URL
   "temperature": 0.7,        // 可选：温度参数
   "max_tokens": 2048,        // 可选：最大 Token 数
   "options": {               // 可选：其他选项
     "organization": "org-id"
   }
+}
+```
+
+#### 智谱AI 配置示例 🆕
+```json
+{
+  "type": "zhipu",
+  "model": "glm-4",
+  "api_key": "${ZHIPU_API_KEY}",
+  "temperature": 0.9,
+  "max_tokens": 1024
+}
+```
+
+#### 硅基流动 配置示例 🆕
+```json
+{
+  "type": "siliconflow", 
+  "model": "Qwen/Qwen2-7B-Instruct",
+  "api_key": "${SILICONFLOW_API_KEY}",
+  "temperature": 0.7,
+  "max_tokens": 2048
 }
 ```
 
@@ -241,6 +403,8 @@ export DEEPSEEK_API_KEY="your-deepseek-key"
 export KIMI_API_KEY="your-kimi-key"
 export QWEN_API_KEY="your-qwen-key"
 export ANTHROPIC_API_KEY="your-anthropic-key"
+export ZHIPU_API_KEY="your-zhipu-key"               # 智谱AI 🆕
+export SILICONFLOW_API_KEY="your-siliconflow-key"   # 硅基流动 🆕
 ```
 
 ## 配置验证
@@ -326,6 +490,14 @@ if err != nil {
 - `GenerateQwenChatConfig(filename string) error`: 生成通义千问聊天配置
 - `GenerateReactAgentConfig(llmType, model, filename string) error`: 生成ReAct智能体配置
 - `GenerateExecutorWithDeepSeek(filename string) error`: 生成DeepSeek执行器配置
+
+#### 智谱AI配置方法 🆕
+- `GenerateZhipuChatConfig(filename string) error`: 生成智谱AI聊天配置
+- `GenerateExecutorWithZhipu(filename string) error`: 生成智谱AI执行器配置
+
+#### 硅基流动配置方法 🆕
+- `GenerateSiliconFlowChatConfig(filename string) error`: 生成硅基流动聊天配置
+- `GenerateExecutorWithSiliconFlow(filename string) error`: 生成硅基流动执行器配置
 
 #### 自定义配置方法
 - `GenerateLLMConfig(template LLMTemplate, filename string) error`: 自定义LLM配置

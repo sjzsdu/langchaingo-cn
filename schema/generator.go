@@ -365,6 +365,34 @@ func (g *ConfigGenerator) GenerateQwenChatConfig(filename string) error {
 	}, filename)
 }
 
+// GenerateZhipuChatConfig 生成智谱AI聊天配置
+func (g *ConfigGenerator) GenerateZhipuChatConfig(filename string) error {
+	return g.GenerateChainConfig(ChainTemplate{
+		Type: "conversation",
+		LLMTemplate: LLMTemplate{
+			Type:        "zhipu",
+			Model:       "glm-4",
+			Temperature: 0.7,
+			MaxTokens:   2048,
+		},
+		MemoryType: "conversation_buffer",
+	}, filename)
+}
+
+// GenerateSiliconFlowChatConfig 生成硅基流动聊天配置
+func (g *ConfigGenerator) GenerateSiliconFlowChatConfig(filename string) error {
+	return g.GenerateChainConfig(ChainTemplate{
+		Type: "conversation",
+		LLMTemplate: LLMTemplate{
+			Type:        "siliconflow",
+			Model:       "Qwen/Qwen2.5-72B-Instruct",
+			Temperature: 0.7,
+			MaxTokens:   2048,
+		},
+		MemoryType: "conversation_buffer",
+	}, filename)
+}
+
 // GenerateReactAgentConfig 生成零样本ReAct智能体配置
 func (g *ConfigGenerator) GenerateReactAgentConfig(llmType, model, filename string) error {
 	return g.GenerateAgentConfig(AgentTemplate{
@@ -414,6 +442,44 @@ func (g *ConfigGenerator) GenerateExecutorWithDeepSeek(filename string) error {
 	}, filename)
 }
 
+// GenerateExecutorWithZhipu 生成基于智谱AI的执行器配置
+func (g *ConfigGenerator) GenerateExecutorWithZhipu(filename string) error {
+	return g.GenerateExecutorConfig(ExecutorTemplate{
+		AgentTemplate: AgentTemplate{
+			Type: "zero_shot_react",
+			LLMTemplate: LLMTemplate{
+				Type:        "zhipu",
+				Model:       "glm-4",
+				Temperature: 0.7,
+				MaxTokens:   2000,
+			},
+			MemoryType: "conversation_buffer",
+			MaxSteps:   5,
+		},
+		MaxIterations:           10,
+		ReturnIntermediateSteps: true,
+	}, filename)
+}
+
+// GenerateExecutorWithSiliconFlow 生成基于硅基流动的执行器配置
+func (g *ConfigGenerator) GenerateExecutorWithSiliconFlow(filename string) error {
+	return g.GenerateExecutorConfig(ExecutorTemplate{
+		AgentTemplate: AgentTemplate{
+			Type: "zero_shot_react",
+			LLMTemplate: LLMTemplate{
+				Type:        "siliconflow",
+				Model:       "Qwen/Qwen2.5-72B-Instruct",
+				Temperature: 0.7,
+				MaxTokens:   2000,
+			},
+			MemoryType: "conversation_buffer",
+			MaxSteps:   5,
+		},
+		MaxIterations:           10,
+		ReturnIntermediateSteps: true,
+	}, filename)
+}
+
 // 辅助方法
 
 // getDefaultAPIKeyEnv 获取默认API密钥环境变量名
@@ -427,6 +493,10 @@ func (g *ConfigGenerator) getDefaultAPIKeyEnv(llmType string) string {
 		return "${KIMI_API_KEY}"
 	case "qwen":
 		return "${QWEN_API_KEY}"
+	case "zhipu":
+		return "${ZHIPU_API_KEY}"
+	case "siliconflow":
+		return "${SILICONFLOW_API_KEY}"
 	case "anthropic":
 		return "${ANTHROPIC_API_KEY}"
 	default:
