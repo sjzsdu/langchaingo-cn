@@ -203,7 +203,7 @@ func (l *LLMConfig) Validate() error {
 		return fmt.Errorf("type is required")
 	}
 
-	supportedTypes := []string{"openai", "deepseek", "kimi", "qwen", "anthropic", "ollama"}
+	supportedTypes := []string{"openai", "deepseek", "kimi", "qwen", "zhipu", "siliconflow", "anthropic", "ollama"}
 	if !contains(supportedTypes, l.Type) {
 		return fmt.Errorf("unsupported type: %s, supported: %s", l.Type, strings.Join(supportedTypes, ", "))
 	}

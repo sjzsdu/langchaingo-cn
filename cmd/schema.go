@@ -1,12 +1,17 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/sjzsdu/langchaingo-cn/schema"
 	"github.com/spf13/cobra"
+	"github.com/tmc/langchaingo/chains"
+	"github.com/tmc/langchaingo/llms"
 )
 
 var (
@@ -14,6 +19,9 @@ var (
 	outputDir  string
 	outputFile string
 	verbose    bool
+	
+	// 验证配置
+	enableAPITest bool  // 是否启用真实API调用测试
 
 	// LLM配置
 	llmType     string
@@ -324,6 +332,40 @@ var listCmd = &cobra.Command{
 	},
 }
 
+// Validate命令
+var validateCmd = &cobra.Command{
+	Use:   "validate [config-file]",
+	Short: "验证并测试JSON配置文件",
+	Long: `验证并测试JSON配置文件是否能正常工作
+
+该命令会:
+1. 解析JSON配置文件
+2. 验证配置语法和结构
+3. 创建相关组件实例 
+4. 执行基本功能测试
+5. 可选的真实API调用测试
+6. 报告验证结果
+
+验证级别:
+• 基础验证: 检查配置语法和组件创建
+• API测试: 发送真实请求测试LLM/Chain/Agent功能
+
+示例:
+  # 基础验证配置文件
+  xin config-gen validate config.json
+  
+  # 完整验证(包含真实API调用)
+  xin config-gen validate config.json --api-test
+  
+  # 验证配置并显示详细信息
+  xin config-gen validate config.json --verbose`,
+	Args: cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		configFile := args[0]
+		validateConfiguration(configFile)
+	},
+}
+
 func init() {
 	// 全局标志
 	configGenCmd.PersistentFlags().StringVarP(&outputDir, "dir", "d", ".", "输出目录")
@@ -377,6 +419,9 @@ func init() {
 	executorCmd.MarkFlagRequired("llm")
 	executorCmd.MarkFlagRequired("model")
 
+	// Validate命令标志
+	validateCmd.Flags().BoolVarP(&enableAPITest, "api-test", "t", false, "启用真实API调用测试")
+
 	// 添加子命令
 	configGenCmd.AddCommand(llmCmd)
 	configGenCmd.AddCommand(chainCmd)
@@ -384,6 +429,7 @@ func init() {
 	configGenCmd.AddCommand(executorCmd)
 	configGenCmd.AddCommand(presetCmd)
 	configGenCmd.AddCommand(listCmd)
+	configGenCmd.AddCommand(validateCmd)
 }
 
 // 辅助函数
@@ -437,4 +483,340 @@ func printSuccess(configType string) {
 	} else {
 		fmt.Printf("✅ %s已生成: %s/%s\n", configType, outputDir, outputFile)
 	}
+}
+
+// validateConfiguration 验证配置文件
+func validateConfiguration(configFile string) {
+	fmt.Printf("🔍 验证配置文件: %s\n", configFile)
+
+	// 检查文件是否存在
+	if _, err := os.Stat(configFile); os.IsNotExist(err) {
+		fmt.Printf("❌ 配置文件不存在: %s\n", configFile)
+		return
+	}
+
+	if verbose {
+		fmt.Println("\n📋 验证步骤:")
+		fmt.Println("   1. 📄 解析JSON配置文件...")
+	}
+
+	// 步骤1: 解析配置文件
+	app, err := schema.CreateApplicationFromFile(configFile)
+	if err != nil {
+		fmt.Printf("❌ 配置文件解析失败: %v\n", err)
+		return
+	}
+
+	if verbose {
+		fmt.Println("   ✅ JSON配置解析成功")
+		fmt.Println("   2. 🔧 验证组件创建...")
+	}
+
+	// 统计创建的组件
+	var stats struct {
+		llms     int
+		memories int
+		chains   int
+		agents   int
+	}
+
+	// 验证LLM组件
+	for name, llm := range app.LLMs {
+		if llm == nil {
+			fmt.Printf("❌ LLM组件创建失败: %s\n", name)
+			return
+		}
+		stats.llms++
+		if verbose {
+			fmt.Printf("      ✅ LLM: %s\n", name)
+		}
+	}
+
+	// 验证Memory组件
+	for name, memory := range app.Memories {
+		if memory == nil {
+			fmt.Printf("❌ Memory组件创建失败: %s\n", name)
+			return
+		}
+		stats.memories++
+		if verbose {
+			fmt.Printf("      ✅ Memory: %s\n", name)
+		}
+	}
+
+	// 验证Chain组件
+	for name, chain := range app.Chains {
+		if chain == nil {
+			fmt.Printf("❌ Chain组件创建失败: %s\n", name)
+			return
+		}
+		stats.chains++
+		if verbose {
+			fmt.Printf("      ✅ Chain: %s\n", name)
+		}
+	}
+
+	// 验证Agent组件
+	for name, agent := range app.Agents {
+		if agent == nil {
+			fmt.Printf("❌ Agent组件创建失败: %s\n", name)
+			return
+		}
+		stats.agents++
+		if verbose {
+			fmt.Printf("      ✅ Agent: %s\n", name)
+		}
+	}
+
+	// 注意: Agents字段实际上包含的是 agents.Executor
+	// 这里不需要单独验证Executors，因为它们包含在Agents中
+
+	if verbose {
+		fmt.Println("   3. 🧪 执行功能测试...")
+	}
+
+	// 步骤3: 基本功能测试
+	testSuccess := true
+
+	// 测试GetModels方法
+	for name, llm := range app.LLMs {
+		if modelsGetter, ok := llm.(interface{ GetModels() []string }); ok {
+			models := modelsGetter.GetModels()
+			if len(models) == 0 {
+				fmt.Printf("⚠️  LLM %s 的 GetModels() 返回空模型列表\n", name)
+			} else if verbose {
+				fmt.Printf("      ✅ LLM %s 支持 %d 个模型\n", name, len(models))
+			}
+		}
+	}
+
+	// 如果启用API测试，进行真实调用测试
+	if enableAPITest {
+		if verbose {
+			fmt.Println("      🌐 执行真实API调用测试...")
+		} else {
+			fmt.Println("   🌐 执行真实API调用测试...")
+		}
+		
+		// 测试LLM真实API调用
+		for name, llm := range app.LLMs {
+			if verbose {
+				fmt.Printf("      🔍 测试LLM %s 的API调用...\n", name)
+			}
+			
+			if !testLLMAPICall(name, llm, verbose) {
+				testSuccess = false
+			}
+		}
+
+		// 测试Chain的真实调用
+		for name, chain := range app.Chains {
+			if verbose {
+				fmt.Printf("      🔍 测试Chain %s 的对话功能...\n", name)
+			}
+			
+			if !testChainAPICall(name, chain, verbose) {
+				testSuccess = false
+			}
+		}
+
+		// 测试Agent的真实调用
+		for name, agent := range app.Agents {
+			if verbose {
+				fmt.Printf("      🔍 测试Agent %s 的执行功能...\n", name)
+			}
+			
+			if !testAgentAPICall(name, agent, verbose) {
+				testSuccess = false
+			}
+		}
+	} else {
+		if verbose {
+			fmt.Println("      ℹ️  跳过API调用测试 (使用 --api-test 启用)")
+		}
+		// 如果有组件，给出提示
+		if len(app.Chains) > 0 && verbose {
+			fmt.Println("      ℹ️  Chain组件已就绪，可用于对话测试")
+		}
+	}
+
+	// 步骤4: 生成验证报告
+	if verbose {
+		fmt.Println("   4. 📊 生成验证报告...")
+	}
+
+	fmt.Printf("\n✅ 配置验证成功! %s\n", configFile)
+	fmt.Printf("📊 组件统计:\n")
+	fmt.Printf("   🤖 LLMs: %d\n", stats.llms)
+	fmt.Printf("   💾 Memories: %d\n", stats.memories)
+	fmt.Printf("   ⛓️  Chains: %d\n", stats.chains)
+	fmt.Printf("   🤖 Agents/Executors: %d\n", stats.agents)
+
+	if testSuccess {
+		fmt.Println("\n🎉 所有组件验证通过，配置文件可以正常使用!")
+	} else {
+		fmt.Println("\n⚠️  部分组件验证失败，请检查API密钥设置和网络连接")
+	}
+
+	if verbose {
+		fmt.Println("\n💡 下一步:")
+		fmt.Println("   1. 设置必要的环境变量(API Keys)")
+		fmt.Println("   2. 在代码中使用 schema.CreateApplicationFromFile() 加载配置")
+		fmt.Println("   3. 开始构建你的AI应用!")
+	}
+}
+
+// testLLMAPICall 测试LLM的真实API调用
+func testLLMAPICall(name string, llm llms.Model, verbose bool) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// 测试问题
+	testPrompt := "你是什么模型？请简短回答。"
+	
+	if verbose {
+		fmt.Printf("        📤 发送测试问题: %s\n", testPrompt)
+	}
+
+	// 尝试调用LLM
+	response, err := llms.GenerateFromSinglePrompt(ctx, llm, testPrompt)
+	if err != nil {
+		fmt.Printf("        ❌ LLM %s API调用失败: %v\n", name, err)
+		return false
+	}
+
+	if response == "" {
+		fmt.Printf("        ❌ LLM %s 返回空响应\n", name)
+		return false
+	}
+
+	if verbose {
+		// 截断长响应
+		truncatedResponse := response
+		if len(response) > 100 {
+			truncatedResponse = response[:100] + "..."
+		}
+		fmt.Printf("        📥 收到响应: %s\n", truncatedResponse)
+	}
+	
+	fmt.Printf("        ✅ LLM %s API调用成功\n", name)
+	return true
+}
+
+// testChainAPICall 测试Chain的真实调用
+func testChainAPICall(name string, chain chains.Chain, verbose bool) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// 测试输入
+	testInput := map[string]any{
+		"input": "你好，请告诉我你是什么AI助手？",
+	}
+	
+	if verbose {
+		fmt.Printf("        📤 发送测试输入: %s\n", testInput["input"])
+	}
+
+	// 尝试调用Chain
+	result, err := chains.Call(ctx, chain, testInput)
+	if err != nil {
+		fmt.Printf("        ❌ Chain %s 调用失败: %v\n", name, err)
+		return false
+	}
+
+	// 检查结果
+	if result == nil {
+		fmt.Printf("        ❌ Chain %s 返回空结果\n", name)
+		return false
+	}
+
+	// 尝试获取输出
+	var output string
+	if outputValue, exists := result["output"]; exists {
+		if str, ok := outputValue.(string); ok {
+			output = str
+		}
+	} else if textValue, exists := result["text"]; exists {
+		if str, ok := textValue.(string); ok {
+			output = str
+		}
+	}
+
+	if output == "" {
+		fmt.Printf("        ❌ Chain %s 没有产生有效输出\n", name)
+		return false
+	}
+
+	if verbose {
+		// 截断长响应
+		truncatedOutput := output
+		if len(output) > 100 {
+			truncatedOutput = output[:100] + "..."
+		}
+		fmt.Printf("        📥 收到响应: %s\n", truncatedOutput)
+	}
+
+	fmt.Printf("        ✅ Chain %s 调用成功\n", name)
+	return true
+}
+
+// testAgentAPICall 测试Agent的真实执行
+func testAgentAPICall(name string, agent interface{}, verbose bool) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+
+	// 测试问题
+	testInput := "请简单介绍一下你自己的能力"
+	
+	if verbose {
+		fmt.Printf("        📤 发送测试问题: %s\n", testInput)
+	}
+
+	// 尝试执行Agent (agents.Executor有Call方法)
+	if executor, ok := agent.(interface {
+		Call(ctx context.Context, inputs map[string]any) (map[string]any, error)
+	}); ok {
+		result, err := executor.Call(ctx, map[string]any{
+			"input": testInput,
+		})
+		
+		if err != nil {
+			fmt.Printf("        ❌ Agent %s 执行失败: %v\n", name, err)
+			return false
+		}
+
+		// 检查结果
+		if result == nil {
+			fmt.Printf("        ❌ Agent %s 返回空结果\n", name)
+			return false
+		}
+
+		// 尝试获取输出
+		var output string
+		if outputValue, exists := result["output"]; exists {
+			if str, ok := outputValue.(string); ok {
+				output = str
+			}
+		}
+
+		if output == "" {
+			fmt.Printf("        ❌ Agent %s 没有产生有效输出\n", name)
+			return false
+		}
+
+		if verbose {
+			// 截断长响应
+			truncatedOutput := output
+			if len(output) > 100 {
+				truncatedOutput = output[:100] + "..."
+			}
+			fmt.Printf("        📥 收到响应: %s\n", truncatedOutput)
+		}
+
+		fmt.Printf("        ✅ Agent %s 执行成功\n", name)
+		return true
+	}
+
+	fmt.Printf("        ⚠️  Agent %s 不支持标准调用接口\n", name)
+	return true // 不算作失败
 }

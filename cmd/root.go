@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/sjzsdu/langchaingo-cn/share"
 	"github.com/spf13/cobra"
 )
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "xin",
+	Use:   share.BUILDNAME,
 	Short: "🚀 LangChainGo-CN - 中文化的 LangChain Go 版本",
 	Long: `🚀 LangChainGo-CN - 中文化的 LangChain Go 版本
 
@@ -23,7 +24,7 @@ var rootCmd = &cobra.Command{
   • 📊 图形化工作流 (Graph)
   • 💾 多种记忆类型支持
   • 🔧 配置文件生成工具`,
-	Version: "1.0.0",
+	Version: share.VERSION,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

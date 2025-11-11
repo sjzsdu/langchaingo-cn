@@ -156,6 +156,83 @@ go run main.go config-gen list
 - `siliconflow-chat`: 硅基流动 聊天配置 🆕
 - `siliconflow-executor`: 硅基流动 执行器配置 🆕
 
+### 配置验证 🆕
+
+新增了配置文件验证命令，可以验证生成的JSON配置是否有效：
+
+```bash
+# 基础验证配置文件
+go run main.go config-gen validate config.json
+
+# 详细验证模式
+go run main.go config-gen validate config.json --verbose
+
+# 完整验证(包含真实API调用测试) 🚀
+go run main.go config-gen validate config.json --api-test --verbose
+```
+
+该命令支持两种验证级别：
+
+**基础验证** (默认):
+- ✅ JSON语法和结构验证
+- ✅ 组件类型和配置有效性检查  
+- ✅ 实际组件创建测试
+- ✅ GetModels()等基本功能测试
+- ✅ 生成详细验证报告
+
+**API测试验证** (`--api-test`):
+- ✅ 包含所有基础验证功能
+- 🌐 **真实API调用测试**: 发送测试请求给LLM
+- 🌐 **Chain功能测试**: 验证对话链是否正常工作
+- 🌐 **Agent执行测试**: 验证智能体是否能正常执行任务
+- 📊 完整的功能验证报告
+
+#### API测试工作原理 🚀
+
+当使用 `--api-test` 参数时，验证器会执行以下真实测试：
+
+**LLM测试**:
+```
+测试问题: "你是什么模型？请简短回答。"
+验证标准: 收到非空响应且无错误
+超时设置: 30秒
+```
+
+**Chain测试**:
+```
+测试输入: "你好，请告诉我你是什么AI助手？"
+验证标准: 对话链正常执行并返回有效响应
+超时设置: 30秒
+```
+
+**Agent测试**:
+```
+测试任务: "请简单介绍一下你自己的能力"
+验证标准: 智能体成功执行并产生输出
+超时设置: 45秒
+```
+
+⚠️ **注意**: API测试需要有效的API密钥和网络连接，测试会产生实际的API调用费用。
+
+#### 验证最佳实践
+
+**开发阶段建议**:
+```bash
+# 1. 首先进行基础验证，确保配置正确
+go run main.go config-gen validate config.json --verbose
+
+# 2. 配置无误后，进行API测试验证功能
+go run main.go config-gen validate config.json --api-test --verbose
+
+# 3. 生产环境部署前的最终验证
+go run main.go config-gen validate production-config.json --api-test
+```
+
+**故障排除**:
+- 如果基础验证失败：检查JSON语法和配置参数
+- 如果API测试失败：验证API密钥设置和网络连接
+- 如果超时：检查网络状况或增大超时设置
+
 ### 示例命令
 
 ```bash
@@ -173,6 +250,12 @@ go run main.go config-gen llm --llm zhipu --model glm-4 -o custom_zhipu.json
 
 # 生成Chain配置
 go run main.go config-gen chain --llm siliconflow --model Qwen/Qwen2-7B-Instruct -o sf_chain.json
+
+# 验证生成的配置文件 🆕
+go run main.go config-gen validate zhipu_config.json --verbose
+
+# 完整API测试验证 🚀
+go run main.go config-gen validate zhipu_config.json --api-test
 ```
 
 ### 预设配置快捷方法
